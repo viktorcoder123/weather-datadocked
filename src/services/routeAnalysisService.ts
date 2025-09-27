@@ -143,7 +143,7 @@ export const parseDestinationCoordinates = async (destination: string): Promise<
 
 // Fetch route from Python searoute service
 export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RoutePoint[], type: 'maritime' | 'great-circle'}> => {
-  const ROUTE_SERVICE_URL = 'http://localhost:5000';
+  const ROUTE_SERVICE_URL = 'https://weather-datadocked.onrender.com';
 
   // Check if vessel is stationary or has no destination - use local forecast generation
   const isStationary = vessel.speed <= 1;
