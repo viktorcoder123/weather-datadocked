@@ -159,11 +159,21 @@ export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RouteP
     // Prioritize UNLOCODE destination, then fall back to regular destination
     const destinationToUse = vessel.unlocode_destination || vessel.destination;
 
+    // First, resolve the destination coordinates using our port service
+    const destinationCoords = await parseDestinationCoordinates(destinationToUse);
+
+    if (!destinationCoords) {
+      console.warn('Could not resolve destination coordinates for:', destinationToUse);
+      const route = await projectVesselRouteGreatCircle(vessel);
+      return { route, type: 'great-circle' };
+    }
+
     console.log('Route request:', {
       destination: destinationToUse,
       unlocode_destination: vessel.unlocode_destination,
       regular_destination: vessel.destination,
-      using: vessel.unlocode_destination ? 'UNLOCODE' : 'regular destination'
+      using: vessel.unlocode_destination ? 'UNLOCODE' : 'regular destination',
+      resolvedCoords: destinationCoords
     });
 
     const response = await fetch(`${ROUTE_SERVICE_URL}/route`, {
@@ -174,6 +184,8 @@ export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RouteP
       body: JSON.stringify({
         start_lat: vessel.latitude,
         start_lng: vessel.longitude,
+        end_lat: destinationCoords.lat,
+        end_lng: destinationCoords.lng,
         destination: destinationToUse,
         speed: vessel.speed
       })
