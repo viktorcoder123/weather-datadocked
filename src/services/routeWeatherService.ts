@@ -165,7 +165,7 @@ export const fetchWeatherAtPointAndTime = async (
           console.warn('WeatherAPI response not ok:', response.status);
         }
       } else {
-        console.warn('Target time beyond WeatherAPI limit:', daysFromNow, 'days (max 10). Will use enhanced mock data.');
+        console.warn('Target time beyond WeatherAPI limit:', daysFromNow, 'days (max 10). No data available in API-only mode.');
       }
     } catch (error) {
       console.warn('WeatherAPI error for point:', error);
