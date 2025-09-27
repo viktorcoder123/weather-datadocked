@@ -53,24 +53,47 @@ export const fetchWeatherAtPointAndTime = async (
     try {
       // WeatherAPI provides forecasts up to 10 days
       const daysFromNow = Math.ceil((targetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      const requestDays = Math.max(1, daysFromNow + 1);
 
-      console.log(`Fetching weather for ${lat.toFixed(3)}, ${lng.toFixed(3)} at ${targetTime.toISOString()}, ${daysFromNow} days from now`);
+      console.log(`🔍 DEBUG: Fetching weather for ${lat.toFixed(3)}, ${lng.toFixed(3)}`);
+      console.log(`📅 Target time: ${targetTime.toISOString()}`);
+      console.log(`📊 Days calculation: ${daysFromNow} days from now`);
+      console.log(`🌐 API request: ${requestDays} days of forecast data`);
+      console.log(`⏰ Now: ${new Date().toISOString()}`);
 
       if (daysFromNow <= 10) {
-        const response = await fetch(
-          `https://api.weatherapi.com/v1/forecast.json?key=${apiKeys.weatherapi}&q=${lat},${lng}&days=${Math.max(1, daysFromNow + 1)}&aqi=yes&alerts=yes`
-        );
+        const apiUrl = `https://api.weatherapi.com/v1/forecast.json?key=${apiKeys.weatherapi}&q=${lat},${lng}&days=${requestDays}&aqi=yes&alerts=yes`;
+        console.log(`🔗 API URL: ${apiUrl.replace(apiKeys.weatherapi, '[API_KEY]')}`);
+
+        const response = await fetch(apiUrl);
 
         if (response.ok) {
           const data = await response.json();
 
           // Find the forecast for the target date
           const targetDate = targetTime.toISOString().split('T')[0];
+
+          console.log(`🎯 Target date to find: ${targetDate}`);
+          console.log(`📋 Available forecast days:`, data.forecast?.forecastday?.map((day: any) => day.date) || []);
+          console.log(`📊 Total forecast days returned: ${data.forecast?.forecastday?.length || 0}`);
+
           const forecastDay = data.forecast?.forecastday?.find((day: any) =>
             day.date === targetDate
           );
 
-          console.log(`Target date: ${targetDate}, Found forecast day:`, forecastDay ? 'Yes' : 'No');
+          console.log(`✅ Found forecast day for ${targetDate}:`, forecastDay ? 'Yes' : 'No');
+
+          if (!forecastDay) {
+            console.log(`❌ MISSING FORECAST DAY! Requested ${requestDays} days, but ${targetDate} not in response`);
+            console.log(`📅 Date arithmetic check:`);
+            console.log(`   Now: ${new Date().toDateString()}`);
+            console.log(`   Target: ${targetTime.toDateString()}`);
+            console.log(`   Days diff: ${Math.ceil((targetTime.getTime() - Date.now()) / (1000 * 60 * 60 * 24))}`);
+
+            // Return null to indicate this waypoint has no weather data
+            results.source = 'missing-api-date';
+            return results;
+          }
 
           if (forecastDay) {
             // Find the closest hour in the forecast
@@ -225,6 +248,17 @@ export const fetchRouteWeatherForecast = async (
   const routeWeather: WeatherAtPoint[] = [];
 
   console.log(`Fetching weather for ${routePoints.length} route points...`);
+
+  // Log the time range we're trying to fetch
+  if (routePoints.length > 0) {
+    const firstTime = new Date(routePoints[0].estimatedTime);
+    const lastTime = new Date(routePoints[routePoints.length - 1].estimatedTime);
+    const totalHours = (lastTime.getTime() - firstTime.getTime()) / (1000 * 60 * 60);
+    const totalDays = totalHours / 24;
+    console.log(`Weather fetch time range: ${firstTime.toISOString()} to ${lastTime.toISOString()}`);
+    console.log(`Duration: ${totalHours.toFixed(1)} hours (${totalDays.toFixed(1)} days)`);
+  }
+
   console.log('Route timeline:', routePoints.map(p => ({
     time: new Date(p.estimatedTime).toISOString(),
     location: `${p.lat.toFixed(3)}, ${p.lng.toFixed(3)}`,
@@ -233,14 +267,11 @@ export const fetchRouteWeatherForecast = async (
 
   // Fetch weather for each significant waypoint
   const weatherPromises = routePoints.map(async (point, index) => {
-    // Skip some intermediate points to avoid too many API calls
-    const shouldFetch = index === 0 || // Always fetch for start
-                       index === routePoints.length - 1 || // Always fetch for end
-                       index % 2 === 0; // Fetch every other intermediate point
+    const hoursFromNow = (new Date(point.estimatedTime).getTime() - Date.now()) / (1000 * 60 * 60);
+    console.log(`Fetching weather for waypoint ${index}: ${hoursFromNow.toFixed(1)}h from now`);
 
-    if (!shouldFetch) {
-      return null;
-    }
+    // In API-only mode, fetch for all waypoints since we're already limited to 10 days
+    // No need to skip intermediate points since we have fewer total waypoints
 
     const weather = await fetchWeatherAtPointAndTime(
       point.lat,
@@ -249,14 +280,32 @@ export const fetchRouteWeatherForecast = async (
     );
 
     if (weather) {
+      console.log(`✓ Got weather data for waypoint ${index} (${hoursFromNow.toFixed(1)}h)`);
       weather.distanceFromStart = point.distanceFromStart;
       return weather;
     }
 
+    console.log(`✗ No weather data for waypoint ${index} (${hoursFromNow.toFixed(1)}h)`);
     return null;
   });
 
   const weatherResults = await Promise.all(weatherPromises);
+
+  console.log(`📊 Weather fetch results summary:`);
+  console.log(`   Total requests: ${routePoints.length}`);
+  console.log(`   Successful: ${weatherResults.filter(w => w !== null).length}`);
+  console.log(`   Failed/null: ${weatherResults.filter(w => w === null).length}`);
+
+  // Show which specific waypoints failed
+  weatherResults.forEach((result, index) => {
+    if (result === null) {
+      const point = routePoints[index];
+      const hoursFromNow = (new Date(point.estimatedTime).getTime() - Date.now()) / (1000 * 60 * 60);
+      console.log(`❌ Waypoint ${index} FAILED: ${new Date(point.estimatedTime).toISOString()} (${hoursFromNow.toFixed(1)}h from now)`);
+    } else {
+      console.log(`✅ Waypoint ${index} OK: ${new Date(result.time).toISOString()} (source: ${result.source})`);
+    }
+  });
 
   // Filter out null results
   routeWeather.push(...weatherResults.filter(w => w !== null) as WeatherAtPoint[]);

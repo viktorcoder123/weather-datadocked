@@ -6,11 +6,13 @@ Provides realistic maritime routing that follows shipping lanes and avoids land
 
 import os
 import sys
+import asyncio
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import searoute as sr
 import json
 from datetime import datetime, timedelta
+from port_service import find_port_coordinates, get_port_service
 
 app = Flask(__name__)
 CORS(app)  # Enable CORS for frontend access
@@ -52,26 +54,14 @@ PORT_COORDINATES = {
     'Buenos Aires': [-34.6118, -58.3960],
     'Sydney': [-33.8688, 151.2093],
     'Melbourne': [-37.8136, 144.9631],
-    'Auckland': [-36.8485, 174.7633]
+    'Auckland': [-36.8485, 174.7633],
+    'Amsterdam': [52.3676, 4.9041],
+    'Amsterdam, Netherlands': [52.3676, 4.9041]
 }
 
-def find_port_coordinates(destination_name):
-    """Find coordinates for a destination port"""
-    if not destination_name:
-        return None
-
-    # Try exact match first
-    if destination_name in PORT_COORDINATES:
-        return PORT_COORDINATES[destination_name]
-
-    # Try partial match
-    destination_lower = destination_name.lower()
-    for port, coords in PORT_COORDINATES.items():
-        if (destination_lower in port.lower() or
-            port.lower() in destination_lower):
-            return coords
-
-    return None
+async def find_port_coordinates_async(destination_name):
+    """Find coordinates for a destination port using async port service"""
+    return await find_port_coordinates(destination_name)
 
 @app.route('/health', methods=['GET'])
 def health_check():
@@ -94,13 +84,17 @@ def calculate_route():
 
         # If no end coordinates provided, try to find them from destination
         if (end_lat == 0 and end_lng == 0) and destination:
-            coords = find_port_coordinates(destination)
+            # Use asyncio to run the async port lookup
+            coords = asyncio.run(find_port_coordinates_async(destination))
             if coords:
                 end_lat, end_lng = coords
             else:
+                port_service = get_port_service()
+                available_ports = port_service.get_available_ports_sample()
                 return jsonify({
                     "error": f"Could not find coordinates for destination: {destination}",
-                    "available_ports": list(PORT_COORDINATES.keys())[:10]  # Show first 10 as examples
+                    "available_ports": available_ports,
+                    "note": "Using Supabase database with 7,799+ ports and fallback to hardcoded ports"
                 }), 400
 
         if end_lat == 0 and end_lng == 0:

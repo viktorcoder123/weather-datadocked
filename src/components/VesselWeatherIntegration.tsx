@@ -34,6 +34,8 @@ interface Vessel {
   navigationalStatus?: string;
   positionReceived?: string;
   updateTime?: string;
+  unlocode_destination?: string;
+  unlocode_lastport?: string;
 }
 
 interface WeatherData {

@@ -1,5 +1,6 @@
 Flask==3.0.0
 Flask-CORS==4.0.0
-searoute==1.0.11
+searoute==1.4.3
 requests==2.31.0
 python-dateutil==2.8.2
+supabase==2.5.0

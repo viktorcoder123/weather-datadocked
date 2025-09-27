@@ -7,6 +7,8 @@ interface Vessel {
   eta?: string;
   etaUtc?: string;
   name: string;
+  unlocode_destination?: string;
+  unlocode_lastport?: string;
 }
 
 interface WeatherPoint {
@@ -117,7 +119,9 @@ export const parseDestinationCoordinates = (destination: string): { lat: number;
     'Genoa': { lat: 44.4056, lng: 8.9463 },
     'Naples': { lat: 40.8518, lng: 14.2681 },
     'Piraeus': { lat: 37.9472, lng: 23.6348 },
-    'Istanbul': { lat: 41.0082, lng: 28.9784 }
+    'Istanbul': { lat: 41.0082, lng: 28.9784 },
+    'Tallinn': { lat: 59.4370, lng: 24.7536 },
+    'Tallinn, Estonia': { lat: 59.4370, lng: 24.7536 }
   };
 
   // Try to find exact match first
@@ -139,7 +143,27 @@ export const parseDestinationCoordinates = (destination: string): { lat: number;
 export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RoutePoint[], type: 'maritime' | 'great-circle'}> => {
   const ROUTE_SERVICE_URL = 'http://localhost:5000';
 
+  // Check if vessel is stationary or has no destination - use local forecast generation
+  const isStationary = vessel.speed <= 1;
+  const hasDestination = vessel.destination && vessel.destination.trim().length > 0;
+
+  if (isStationary || !hasDestination) {
+    console.log('Vessel is stationary or has no destination, generating local forecast waypoints');
+    const route = projectVesselRouteGreatCircle(vessel);
+    return { route, type: 'stationary-forecast' as any };
+  }
+
   try {
+    // Prioritize UNLOCODE destination, then fall back to regular destination
+    const destinationToUse = vessel.unlocode_destination || vessel.destination;
+
+    console.log('Route request:', {
+      destination: destinationToUse,
+      unlocode_destination: vessel.unlocode_destination,
+      regular_destination: vessel.destination,
+      using: vessel.unlocode_destination ? 'UNLOCODE' : 'regular destination'
+    });
+
     const response = await fetch(`${ROUTE_SERVICE_URL}/route`, {
       method: 'POST',
       headers: {
@@ -148,7 +172,7 @@ export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RouteP
       body: JSON.stringify({
         start_lat: vessel.latitude,
         start_lng: vessel.longitude,
-        destination: vessel.destination,
+        destination: destinationToUse,
         speed: vessel.speed
       })
     });
@@ -253,8 +277,9 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
     }
   }
 
-  // Calculate maximum forecast period - limited to API availability
-  const maxApiForecastDays = 10; // WeatherAPI/StormGlass practical limit
+  // For great circle fallback, still use weather API limits for safety
+  // But searoute routes will show complete path to destination
+  const maxApiForecastDays = 10; // WeatherAPI/StormGlass practical limit for fallback only
   const etaDays = etaTime ? Math.ceil((etaTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60 * 24)) : null;
   const forecastDays = Math.min(etaDays || maxApiForecastDays, maxApiForecastDays);
   const maxForecastHours = forecastDays * 24;
@@ -287,16 +312,16 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
   }
 
   if (isStationary) {
-    console.log('Vessel appears stationary, creating time-based waypoints at current position');
+    console.log('Vessel appears stationary, creating extended forecast waypoints at current position');
 
     // For stationary vessels, create waypoints at the same location but different times
     // This allows weather forecasting at the vessel's current position over time
-    // Use shorter intervals since we're limited to API data availability
     const intervalHours = 6; // Standard 6-hour intervals for API data
     const maxHours = maxForecastHours; // Limited by API availability
 
-    console.log(`Creating stationary waypoints: ${intervalHours}h intervals up to ${maxHours}h (${maxHours/24} days) - API data only`);
+    console.log(`Creating stationary forecast: ${intervalHours}h intervals up to ${maxHours}h (${maxHours/24} days)`);
 
+    // Generate more forecast points for stationary vessels
     for (let hour = intervalHours; hour <= maxHours; hour += intervalHours) {
       const estimatedTime = new Date(currentTime.getTime() + hour * 60 * 60 * 1000);
 
@@ -307,6 +332,8 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
         distanceFromStart: 0
       });
     }
+
+    console.log(`Generated ${route.length - 1} forecast waypoints for stationary vessel`);
   } else if (destinationCoords) {
     console.log('Vessel has destination, calculating route to:', vessel.destination);
 
@@ -370,26 +397,52 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
       if (progress >= 1) break;
     }
   } else {
-    console.log('No destination, projecting based on current course:', vessel.course + '°');
+    console.log('No destination provided');
 
-    // No destination provided, project based on current course
-    // Use standard intervals for API data reliability
-    const intervalHours = 6; // Standard 6-hour intervals for API data
-    const maxHours = maxForecastHours; // Limited by API availability
+    // Check if vessel is effectively stationary (speed very low or zero)
+    if (vessel.speed <= 2) {
+      console.log('Low speed vessel - generating stationary forecast waypoints');
 
-    console.log(`Course projection: ${intervalHours}h intervals for ${maxHours}h (${maxHours/24} days) - API data only`);
+      // For low-speed vessels without destination, create forecast at current position
+      const intervalHours = 6; // Standard 6-hour intervals for API data
+      const maxHours = maxForecastHours; // Limited by API availability
 
-    for (let hour = intervalHours; hour <= maxHours; hour += intervalHours) {
-      const distanceCovered = vessel.speed * hour;
-      const waypoint = projectPoint(vessel.latitude, vessel.longitude, vessel.course, distanceCovered);
-      const estimatedTime = new Date(currentTime.getTime() + hour * 60 * 60 * 1000);
+      console.log(`Creating stationary forecast: ${intervalHours}h intervals up to ${maxHours}h (${maxHours/24} days)`);
 
-      route.push({
-        lat: waypoint.lat,
-        lng: waypoint.lng,
-        estimatedTime,
-        distanceFromStart: distanceCovered
-      });
+      for (let hour = intervalHours; hour <= maxHours; hour += intervalHours) {
+        const estimatedTime = new Date(currentTime.getTime() + hour * 60 * 60 * 1000);
+
+        route.push({
+          lat: vessel.latitude,
+          lng: vessel.longitude,
+          estimatedTime,
+          distanceFromStart: 0
+        });
+      }
+
+      console.log(`Generated ${route.length - 1} forecast waypoints for low-speed vessel without destination`);
+    } else {
+      console.log('Projecting course-based route for vessel at', vessel.course + '°');
+
+      // No destination provided, project based on current course
+      // Use standard intervals for API data reliability
+      const intervalHours = 6; // Standard 6-hour intervals for API data
+      const maxHours = maxForecastHours; // Limited by API availability
+
+      console.log(`Course projection: ${intervalHours}h intervals for ${maxHours}h (${maxHours/24} days)`);
+
+      for (let hour = intervalHours; hour <= maxHours; hour += intervalHours) {
+        const distanceCovered = vessel.speed * hour;
+        const waypoint = projectPoint(vessel.latitude, vessel.longitude, vessel.course, distanceCovered);
+        const estimatedTime = new Date(currentTime.getTime() + hour * 60 * 60 * 1000);
+
+        route.push({
+          lat: waypoint.lat,
+          lng: waypoint.lng,
+          estimatedTime,
+          distanceFromStart: distanceCovered
+        });
+      }
     }
   }
 
@@ -572,8 +625,10 @@ export const analyzeVesselRoute = async (vessel: Vessel, weatherData: any): Prom
     const routeWeatherForecast = await fetchRouteWeatherForecast(projectedRoute);
 
     // Merge route points with weather data
+    console.log(`Starting weather data merging for ${projectedRoute.length} waypoints...`);
     routeWithWeather = projectedRoute.map((point, index) => {
-      console.log(`Processing waypoint ${index}: ${point.lat.toFixed(3)}, ${point.lng.toFixed(3)} at ${new Date(point.estimatedTime).toISOString()}`);
+      const timeHours = (new Date(point.estimatedTime).getTime() - Date.now()) / (1000 * 60 * 60);
+      console.log(`Processing waypoint ${index}: ${point.lat.toFixed(3)}, ${point.lng.toFixed(3)} at ${new Date(point.estimatedTime).toISOString()} (${timeHours.toFixed(1)}h from now)`);
 
       // Find the closest weather data point (by time and location)
       const closestWeather = routeWeatherForecast.routeWeather.find(w => {
@@ -585,11 +640,29 @@ export const analyzeVesselRoute = async (vessel: Vessel, weatherData: any): Prom
       });
 
       if (closestWeather) {
-        console.log(`Found weather data for waypoint ${index}:`, {
+        console.log(`✅ Found weather data for waypoint ${index}:`, {
           source: closestWeather.source,
           time: new Date(closestWeather.time).toISOString(),
           hasData: !!closestWeather.current
         });
+      } else {
+        console.log(`❌ NO weather data found for waypoint ${index} at ${new Date(point.estimatedTime).toISOString()}`);
+        console.log(`   Available weather data points: ${routeWeatherForecast.routeWeather.length}`);
+        console.log(`   Looking for location match within 0.1° and time match within 6h`);
+
+        // Show what weather data is available around this time
+        const nearbyWeather = routeWeatherForecast.routeWeather.filter(w => {
+          const timeDiff = Math.abs(new Date(w.time).getTime() - new Date(point.estimatedTime).getTime());
+          return timeDiff < 24 * 60 * 60 * 1000; // Within 24 hours
+        });
+        console.log(`   Weather data within 24h: ${nearbyWeather.length} points`);
+        nearbyWeather.forEach(w => {
+          const timeDiff = Math.abs(new Date(w.time).getTime() - new Date(point.estimatedTime).getTime()) / (1000 * 60 * 60);
+          console.log(`     - ${new Date(w.time).toISOString()} (${timeDiff.toFixed(1)}h diff, source: ${w.source})`);
+        });
+      }
+
+      if (closestWeather) {
 
         // Extract weather data from the API response
         const current = closestWeather.current || {};
@@ -620,25 +693,30 @@ export const analyzeVesselRoute = async (vessel: Vessel, weatherData: any): Prom
           }
         };
       } else {
-        console.warn(`No weather data found for waypoint ${index}, skipping (API-only mode)`);
-        return null; // Return null for waypoints without real weather data
+        // Keep the waypoint but without weather data - show complete route
+        const timeHoursFromNow = (new Date(point.estimatedTime).getTime() - Date.now()) / (1000 * 60 * 60);
+        if (timeHoursFromNow <= 240) { // Only log for waypoints within 10 days
+          console.log(`No weather data for waypoint ${index} at ${timeHoursFromNow.toFixed(1)}h from now, keeping waypoint without weather`);
+        }
+        return {
+          ...point,
+          weather: undefined // No weather data available, but keep the waypoint
+        };
       }
-    }).filter(point => point !== null); // Remove waypoints without real weather data
+    }); // Keep ALL waypoints - show complete searoute path
 
     console.log(`Real weather data available for ${routeWithWeather.length} of ${projectedRoute.length} route points`);
 
   } catch (error) {
-    console.warn('Route weather service unavailable, no weather data will be shown:', error);
+    console.warn('Route weather service unavailable, showing complete route without weather data:', error);
 
-    // In API-only mode, return route without weather data
+    // Show complete route without weather data when service is unavailable
     routeWithWeather = projectedRoute.map(point => ({
       ...point,
-      weather: null // No weather data available
-    })).filter(point => point.weather !== null); // This will result in empty array
+      weather: undefined // No weather data available, but show complete route
+    }));
 
-    // If no weather service available, return empty route
-    routeWithWeather = [];
-    console.log('No weather API available - returning route without weather data');
+    console.log(`No weather API available - showing complete route with ${routeWithWeather.length} waypoints`);
   }
 
   const risks = analyzeWeatherRisks(routeWithWeather, weatherData);

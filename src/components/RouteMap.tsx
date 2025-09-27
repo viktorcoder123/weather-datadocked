@@ -17,6 +17,8 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [showWeather, setShowWeather] = useState(true);
   const [showRoute, setShowRoute] = useState(true);
+  const [showRoutePointsOnly, setShowRoutePointsOnly] = useState(false);
+  const [activeTab, setActiveTab] = useState("map");
 
   useEffect(() => {
     // Load Leaflet dynamically
@@ -113,23 +115,36 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
         }
       }
 
-      // Add weather markers along route
+      // Add markers along route (weather + route waypoints)
       if (showWeather) {
         routeWeather.forEach((point, index) => {
-          if (!point.weather) return;
+          // Determine if this waypoint has weather data
+          const hasWeather = point.weather && point.weather.windSpeed !== undefined;
 
-          const weather = point.weather;
-          const windSpeed = weather.windSpeed || 0;
-          const waveHeight = weather.waveHeight || 0;
+          // Skip waypoints without weather data if showRoutePointsOnly is false
+          if (!hasWeather && !showRoutePointsOnly) {
+            return;
+          }
 
-          // Determine marker color based on conditions
-          let markerColor = '#22c55e'; // Green (good)
-          if (windSpeed > 35 || waveHeight > 4) {
-            markerColor = '#ef4444'; // Red (severe)
-          } else if (windSpeed > 25 || waveHeight > 2) {
-            markerColor = '#f97316'; // Orange (high)
-          } else if (windSpeed > 15 || waveHeight > 1) {
-            markerColor = '#eab308'; // Yellow (medium)
+          let markerColor, popupContent;
+
+          if (hasWeather) {
+            const weather = point.weather;
+            const windSpeed = weather.windSpeed || 0;
+            const waveHeight = weather.waveHeight || 0;
+
+            // Determine marker color based on weather conditions
+            markerColor = '#22c55e'; // Green (good)
+            if (windSpeed > 35 || waveHeight > 4) {
+              markerColor = '#ef4444'; // Red (severe)
+            } else if (windSpeed > 25 || waveHeight > 2) {
+              markerColor = '#f97316'; // Orange (high)
+            } else if (windSpeed > 15 || waveHeight > 1) {
+              markerColor = '#eab308'; // Yellow (medium)
+            }
+          } else {
+            // Route waypoint without weather data
+            markerColor = '#6b7280'; // Gray for route-only waypoints
           }
 
           // Create weather icon
@@ -159,9 +174,14 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
           const timeStr = new Date(point.estimatedTime).toLocaleDateString() + ' ' +
                          new Date(point.estimatedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-          L.marker([point.lat, point.lng], { icon: weatherIcon })
-            .addTo(mapInstance)
-            .bindPopup(`
+          // Create popup content based on whether weather data is available
+          let popupHtml;
+          if (hasWeather) {
+            const weather = point.weather;
+            const windSpeed = weather.windSpeed || 0;
+            const waveHeight = weather.waveHeight || 0;
+
+            popupHtml = `
               <div style="min-width: 250px;">
                 <h4 style="margin: 0 0 8px 0; font-weight: bold;">
                   ${index === 0 ? 'Current Position' :
@@ -181,7 +201,30 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
                   Source: ${weather.source || 'api'}
                 </div>
               </div>
-            `);
+            `;
+          } else {
+            popupHtml = `
+              <div style="min-width: 200px;">
+                <h4 style="margin: 0 0 8px 0; font-weight: bold;">
+                  ${index === 0 ? 'Current Position' :
+                    index === routeWeather.length - 1 ? 'Destination' :
+                    `Route Waypoint ${index}`}
+                </h4>
+                <div style="margin-bottom: 8px;"><strong>Time:</strong> ${timeStr}</div>
+                <div style="margin-bottom: 8px;"><strong>Distance:</strong> ${(point.distanceFromStart || 0).toFixed(1)} nm</div>
+
+                <div style="margin-top: 8px; font-size: 11px; color: #666;">
+                  ${new Date(point.estimatedTime).getTime() > Date.now() + (10 * 24 * 60 * 60 * 1000) ?
+                    'Weather forecast not available (beyond 10-day limit)' :
+                    'Weather data not available for this location'}
+                </div>
+              </div>
+            `;
+          }
+
+          L.marker([point.lat, point.lng], { icon: weatherIcon })
+            .addTo(mapInstance)
+            .bindPopup(popupHtml);
         });
       }
 
@@ -193,7 +236,18 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
     };
 
     updateMap();
-  }, [mapInstance, vessel, routeWeather, showWeather, showRoute]);
+  }, [mapInstance, vessel, routeWeather, showWeather, showRoute, showRoutePointsOnly]);
+
+  // Handle tab changes and fix map size when switching back to map tab
+  useEffect(() => {
+    if (activeTab === "map" && mapInstance) {
+      // Small delay to ensure the container is visible before invalidating size
+      const timer = setTimeout(() => {
+        mapInstance.invalidateSize();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [activeTab, mapInstance]);
 
   if (!isLoaded) {
     return (
@@ -226,7 +280,7 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs defaultValue="map" className="w-full">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="map">Interactive Map</TabsTrigger>
             <TabsTrigger value="controls">Map Controls</TabsTrigger>
@@ -242,7 +296,7 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
                 className="gap-2"
               >
                 <Wind className="h-4 w-4" />
-                Weather Points
+                Route Points
               </Button>
 
               {!isStationary && (
@@ -257,8 +311,21 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
                 </Button>
               )}
 
+              <Button
+                variant={showRoutePointsOnly ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowRoutePointsOnly(!showRoutePointsOnly)}
+                className="gap-2"
+              >
+                <Layers className="h-4 w-4" />
+                Show All Points
+              </Button>
+
               <Badge variant="outline" className="ml-auto">
-                {routeWeather.length} waypoints
+                {showRoutePointsOnly ?
+                  `${routeWeather.length} waypoints` :
+                  `${routeWeather.filter(p => p.weather && p.weather.windSpeed !== undefined).length}/${routeWeather.length} with weather`
+                }
               </Badge>
             </div>
 
@@ -294,6 +361,10 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
                     <div className="w-3 h-3 rounded-full bg-red-500"></div>
                     <span>Severe Conditions</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-gray-500"></div>
+                    <span>Route Waypoint (No Weather)</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -314,7 +385,7 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
                       onChange={(e) => setShowWeather(e.target.checked)}
                       className="rounded"
                     />
-                    Weather Waypoints
+                    Route Points
                   </label>
                   {!isStationary && (
                     <label className="flex items-center gap-2 text-sm">
@@ -327,6 +398,15 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
                       Route Line
                     </label>
                   )}
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={showRoutePointsOnly}
+                      onChange={(e) => setShowRoutePointsOnly(e.target.checked)}
+                      className="rounded"
+                    />
+                    Show All Waypoints (Including No Weather)
+                  </label>
                 </div>
               </Card>
 
