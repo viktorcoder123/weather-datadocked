@@ -4,6 +4,7 @@ interface Vessel {
   course: number;
   speed: number;
   destination?: string;
+  eta?: string;
   etaUtc?: string;
   name: string;
 }
@@ -175,10 +176,94 @@ export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RouteP
   }
 };
 
+// Enhanced ETA parsing function to handle various formats
+const parseVesselETA = (etaString: string): Date | null => {
+  if (!etaString) return null;
+
+  console.log('Parsing ETA string:', etaString);
+
+  // Handle format like "Oct 16, 22:00 (in 19 days)" or "ETA: Oct 16, 22:00 (in 19 days)"
+  const inDaysMatch = etaString.match(/in (\d+) days?\)/i);
+  if (inDaysMatch) {
+    const daysFromNow = parseInt(inDaysMatch[1]);
+    console.log(`ETA indicates ${daysFromNow} days from now`);
+
+    // Extract the date and time part
+    const dateTimeMatch = etaString.match(/([A-Z][a-z]{2}) (\d{1,2}),?\s*(\d{1,2}:\d{2})/i);
+    if (dateTimeMatch) {
+      const [, month, day, time] = dateTimeMatch;
+      console.log('Extracted date components:', { month, day, time });
+
+      // Calculate the target date
+      const targetDate = new Date();
+      targetDate.setDate(targetDate.getDate() + daysFromNow);
+
+      // Parse the time
+      const [hours, minutes] = time.split(':').map(Number);
+      targetDate.setHours(hours, minutes, 0, 0);
+
+      console.log('Calculated ETA:', targetDate.toISOString());
+      return targetDate;
+    }
+  }
+
+  // Handle format like "2024-10-16T22:00:00Z" or ISO dates
+  try {
+    const date = new Date(etaString);
+    if (!isNaN(date.getTime())) {
+      console.log('Parsed as ISO date:', date.toISOString());
+      return date;
+    }
+  } catch (error) {
+    console.warn('Failed to parse as ISO date:', error);
+  }
+
+  // Handle format like "Oct 16, 2024 22:00" without "in X days"
+  try {
+    const cleanedString = etaString.replace(/ETA:\s*/i, '').replace(/\(.*?\)/g, '').trim();
+    const date = new Date(cleanedString);
+    if (!isNaN(date.getTime())) {
+      console.log('Parsed as cleaned date string:', date.toISOString());
+      return date;
+    }
+  } catch (error) {
+    console.warn('Failed to parse as cleaned date string:', error);
+  }
+
+  console.warn('Could not parse ETA format:', etaString);
+  return null;
+};
+
 // Fallback: Project vessel route using great circle calculation (original method)
 export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
   const route: RoutePoint[] = [];
   const currentTime = new Date();
+
+  // Parse ETA if available to determine forecast duration
+  let etaTime: Date | null = null;
+  if (vessel.etaUtc || vessel.eta) {
+    etaTime = parseVesselETA(vessel.etaUtc || vessel.eta || '');
+    if (etaTime) {
+      console.log('Successfully parsed vessel ETA:', etaTime.toISOString());
+      console.log('Hours until ETA:', (etaTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60));
+    } else {
+      console.warn('Could not parse ETA:', vessel.etaUtc || vessel.eta);
+    }
+  }
+
+  // Calculate maximum forecast period
+  const maxForecastDays = 30; // Extend to 30 days for long voyages
+  const etaDays = etaTime ? Math.ceil((etaTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60 * 24)) : null;
+  const forecastDays = Math.min(etaDays || maxForecastDays, maxForecastDays);
+  const maxForecastHours = forecastDays * 24;
+
+  console.log('Extended forecast planning:', {
+    etaDays,
+    forecastDays,
+    maxForecastHours,
+    apiLimitDays: 10,
+    willUseMockBeyond10Days: forecastDays > 10
+  });
 
   // Starting point
   route.push({
@@ -202,7 +287,13 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
 
     // For stationary vessels, create waypoints at the same location but different times
     // This allows weather forecasting at the vessel's current position over time
-    for (let hour = 6; hour <= 72; hour += 6) {
+    // Use dynamic interval based on forecast duration
+    const intervalHours = forecastDays > 10 ? 12 : 6; // Longer intervals for extended forecasts
+    const maxHours = Math.min(maxForecastHours, 720); // Cap at 30 days (720 hours)
+
+    console.log(`Creating stationary waypoints: ${intervalHours}h intervals up to ${maxHours}h (${maxHours/24} days)`);
+
+    for (let hour = intervalHours; hour <= maxHours; hour += intervalHours) {
       const estimatedTime = new Date(currentTime.getTime() + hour * 60 * 60 * 1000);
 
       route.push({
@@ -239,11 +330,18 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
       shouldAdjustCourse
     });
 
-    // Create waypoints every 6 hours along the route
-    const hoursInterval = 6;
-    const totalHours = totalDistance / vessel.speed;
+    // Create waypoints along the route - use dynamic intervals and ETA if available
+    const totalHours = etaTime
+      ? (etaTime.getTime() - currentTime.getTime()) / (1000 * 60 * 60)
+      : totalDistance / vessel.speed;
 
-    for (let hour = hoursInterval; hour <= totalHours; hour += hoursInterval) {
+    // Use adaptive intervals: shorter for short trips, longer for extended voyages
+    const hoursInterval = totalHours > 240 ? 12 : totalHours > 72 ? 8 : 6;
+    const maxHours = Math.min(totalHours, maxForecastHours);
+
+    console.log(`Route planning: ${totalHours.toFixed(1)}h total, ${hoursInterval}h intervals, ${maxHours.toFixed(1)}h forecast`);
+
+    for (let hour = hoursInterval; hour <= maxHours; hour += hoursInterval) {
       const distanceCovered = vessel.speed * hour;
       const progress = Math.min(distanceCovered / totalDistance, 1);
 
@@ -271,8 +369,13 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
     console.log('No destination, projecting based on current course:', vessel.course + '°');
 
     // No destination provided, project based on current course
-    // Create waypoints every 6 hours for next 72 hours
-    for (let hour = 6; hour <= 72; hour += 6) {
+    // Use adaptive intervals and extended forecast duration
+    const intervalHours = forecastDays > 10 ? 12 : 6;
+    const maxHours = Math.min(maxForecastHours, 720); // Cap at 30 days
+
+    console.log(`Course projection: ${intervalHours}h intervals for ${maxHours}h (${maxHours/24} days)`);
+
+    for (let hour = intervalHours; hour <= maxHours; hour += intervalHours) {
       const distanceCovered = vessel.speed * hour;
       const waypoint = projectPoint(vessel.latitude, vessel.longitude, vessel.course, distanceCovered);
       const estimatedTime = new Date(currentTime.getTime() + hour * 60 * 60 * 1000);
@@ -515,10 +618,15 @@ export const analyzeVesselRoute = async (vessel: Vessel, weatherData: any): Prom
       } else {
         console.warn(`No weather data found for waypoint ${index}, using time-varying fallback`);
 
-        // Fallback to time-varying mock data if no weather available
+        // Fallback to enhanced time-varying mock data if no weather available
         const hoursFromNow = (new Date(point.estimatedTime).getTime() - Date.now()) / (1000 * 60 * 60);
-        const dayFactor = Math.sin(hoursFromNow / 12) * 0.3; // Simulate daily variation
+        const daysFromNow = hoursFromNow / 24;
+
+        // Enhanced weather simulation for extended forecasts
+        const dayFactor = Math.sin(hoursFromNow / 12) * 0.3; // Daily variation
+        const seasonalFactor = Math.sin(daysFromNow / 30) * 0.2; // Monthly weather trends
         const positionFactor = Math.sin((point.lat + point.lng) / 50) * 0.2; // Location-based variation
+        const weatherSystemFactor = Math.sin(daysFromNow / 7) * 0.25; // Weekly weather systems
         const randomFactor = (Math.random() - 0.5) * 0.4;
 
         return {
@@ -527,15 +635,15 @@ export const analyzeVesselRoute = async (vessel: Vessel, weatherData: any): Prom
             lat: point.lat,
             lng: point.lng,
             timestamp: point.estimatedTime.toISOString(),
-            windSpeed: Math.max(5, 15 + dayFactor * 10 + positionFactor * 8 + randomFactor * 15),
-            windDirection: 180 + dayFactor * 60 + positionFactor * 45 + randomFactor * 90,
-            waveHeight: Math.max(0.5, 1.5 + dayFactor * 1.5 + positionFactor * 1 + randomFactor * 2),
-            visibility: Math.max(2, 8 + dayFactor * 3 + positionFactor * 2 + randomFactor * 5),
-            precipitation: Math.max(0, dayFactor + positionFactor + randomFactor * 3),
-            temperature: 15 + dayFactor * 5 + positionFactor * 3 + randomFactor * 8,
-            pressure: 1013 + dayFactor * 8 + positionFactor * 5 + randomFactor * 10,
-            humidity: Math.max(30, Math.min(90, 65 + dayFactor * 10 + positionFactor * 5 + randomFactor * 20)),
-            source: 'mock-time-varying'
+            windSpeed: Math.max(5, 15 + dayFactor * 10 + seasonalFactor * 12 + positionFactor * 8 + weatherSystemFactor * 15 + randomFactor * 15),
+            windDirection: 180 + dayFactor * 60 + seasonalFactor * 30 + positionFactor * 45 + weatherSystemFactor * 90 + randomFactor * 90,
+            waveHeight: Math.max(0.5, 1.5 + dayFactor * 1.5 + seasonalFactor * 2 + positionFactor * 1 + weatherSystemFactor * 2.5 + randomFactor * 2),
+            visibility: Math.max(2, 8 + dayFactor * 3 + seasonalFactor * 2 + positionFactor * 2 + weatherSystemFactor * 4 + randomFactor * 5),
+            precipitation: Math.max(0, dayFactor + seasonalFactor * 2 + positionFactor + weatherSystemFactor * 3 + randomFactor * 3),
+            temperature: 15 + dayFactor * 5 + seasonalFactor * 8 + positionFactor * 3 + weatherSystemFactor * 6 + randomFactor * 8,
+            pressure: 1013 + dayFactor * 8 + seasonalFactor * 10 + positionFactor * 5 + weatherSystemFactor * 15 + randomFactor * 10,
+            humidity: Math.max(30, Math.min(90, 65 + dayFactor * 10 + seasonalFactor * 8 + positionFactor * 5 + weatherSystemFactor * 12 + randomFactor * 20)),
+            source: daysFromNow > 10 ? 'mock-extended-forecast' : 'mock-time-varying'
           }
         };
       }

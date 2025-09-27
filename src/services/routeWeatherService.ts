@@ -165,7 +165,7 @@ export const fetchWeatherAtPointAndTime = async (
           console.warn('WeatherAPI response not ok:', response.status);
         }
       } else {
-        console.warn('Target time too far in future for WeatherAPI:', daysFromNow, 'days');
+        console.warn('Target time beyond WeatherAPI limit:', daysFromNow, 'days (max 10). Will use enhanced mock data.');
       }
     } catch (error) {
       console.warn('WeatherAPI error for point:', error);
