@@ -4,14 +4,15 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
-import { Eye, EyeOff, ExternalLink, Ship, Cloud, Wind, MapPin } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { Eye, EyeOff, ExternalLink, Ship, Cloud, Wind, MapPin, Waves, Thermometer } from "lucide-react";
 
 interface ApiKeyData {
   datadocked: string;
   stormglass: string;
   weatherapi: string;
   windy: string;
+  openweathermap: string;
+  worldtides: string;
 }
 
 export const ApiKeySetup = () => {
@@ -20,12 +21,16 @@ export const ApiKeySetup = () => {
     stormglass: "",
     weatherapi: "",
     windy: "",
+    openweathermap: "",
+    worldtides: "",
   });
   const [showKeys, setShowKeys] = useState<Record<keyof ApiKeyData, boolean>>({
     datadocked: false,
     stormglass: false,
     weatherapi: false,
     windy: false,
+    openweathermap: false,
+    worldtides: false,
   });
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -36,17 +41,17 @@ export const ApiKeySetup = () => {
 
   const loadApiKeys = async () => {
     try {
-      const { data, error } = await supabase
-        .from('api_keys')
-        .select('*')
-        .single();
-
-      if (data && !error) {
+      // Load from localStorage for testing
+      const storedKeys = localStorage.getItem('api_keys');
+      if (storedKeys) {
+        const parsedKeys = JSON.parse(storedKeys);
         setApiKeys({
-          datadocked: data.datadocked_api_key || "",
-          stormglass: data.stormglass_api_key || "",
-          weatherapi: data.weatherapi_key || "",
-          windy: data.windy_api_key || ""
+          datadocked: parsedKeys.datadocked || "",
+          stormglass: parsedKeys.stormglass || "",
+          weatherapi: parsedKeys.weatherapi || "",
+          windy: parsedKeys.windy || "",
+          openweathermap: parsedKeys.openweathermap || "",
+          worldtides: parsedKeys.worldtides || ""
         });
       }
     } catch (error) {
@@ -65,32 +70,12 @@ export const ApiKeySetup = () => {
   const handleSaveKeys = async () => {
     setIsLoading(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) {
-        toast({
-          title: "Error",
-          description: "Please sign in to save API keys.",
-          variant: "destructive",
-        });
-        return;
-      }
+      // Save to localStorage for testing
+      localStorage.setItem('api_keys', JSON.stringify(apiKeys));
 
-      const { error } = await supabase
-        .from('api_keys')
-        .upsert({
-          user_id: user.id,
-          datadocked_api_key: apiKeys.datadocked,
-          stormglass_api_key: apiKeys.stormglass,
-          weatherapi_key: apiKeys.weatherapi,
-          windy_api_key: apiKeys.windy
-        });
-
-      if (error) throw error;
-      
       toast({
         title: "Success",
-        description: "API keys have been saved securely.",
+        description: "API keys have been saved locally for testing.",
       });
     } catch (error) {
       toast({
@@ -136,6 +121,22 @@ export const ApiKeySetup = () => {
       url: "https://windy.com",
       placeholder: "Enter your Windy API key",
     },
+    {
+      key: "openweathermap" as keyof ApiKeyData,
+      title: "OpenWeatherMap",
+      description: "Marine weather & ocean data (Free tier available)",
+      icon: Thermometer,
+      url: "https://openweathermap.org/api",
+      placeholder: "Enter your OpenWeatherMap API key",
+    },
+    {
+      key: "worldtides" as keyof ApiKeyData,
+      title: "WorldTides",
+      description: "Global tidal predictions & extremes",
+      icon: Waves,
+      url: "https://www.worldtides.info",
+      placeholder: "Enter your WorldTides API key",
+    },
   ];
 
   return (
@@ -147,7 +148,7 @@ export const ApiKeySetup = () => {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {apiConfigs.map(({ key, title, description, icon: Icon, url, placeholder }) => (
           <Card key={key} className="border-maritime-medium/20">
             <CardHeader>
