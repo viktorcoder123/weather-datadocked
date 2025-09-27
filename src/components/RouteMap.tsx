@@ -3,14 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, Layers, MapPin, Navigation, Wind, Waves, Clock } from "lucide-react";
-
-// Declare Leaflet as global to avoid import issues
-declare global {
-  interface Window {
-    L: any;
-  }
-}
+import { Map, Layers, MapPin, Navigation, Wind } from "lucide-react";
 
 interface RouteMapProps {
   vessel: any;
@@ -19,178 +12,187 @@ interface RouteMapProps {
 }
 
 export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
-  const mapRef = useRef<any>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [mapInstance, setMapInstance] = useState<any>(null);
   const [showWeather, setShowWeather] = useState(true);
   const [showRoute, setShowRoute] = useState(true);
 
   useEffect(() => {
-    // Dynamically import Leaflet to avoid SSR issues
-    const loadMap = async () => {
+    // Load Leaflet dynamically
+    const loadLeaflet = async () => {
       try {
-        const L = await import('leaflet');
-        window.L = L.default;
+        const L = (await import('leaflet')).default;
+
+        // Fix default markers
+        delete (L.Icon.Default.prototype as any)._getIconUrl;
+        L.Icon.Default.mergeOptions({
+          iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+          iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+          shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
+        });
+
         setIsLoaded(true);
+        return L;
       } catch (error) {
         console.error('Failed to load Leaflet:', error);
+        return null;
       }
     };
 
-    loadMap();
+    loadLeaflet();
   }, []);
 
   useEffect(() => {
-    if (!isLoaded || !mapRef.current || !vessel || !routeWeather.length || !window.L) return;
+    if (!isLoaded || !mapRef.current || !vessel || !routeWeather.length) return;
 
-    const L = window.L;
+    const initMap = async () => {
+      const L = (await import('leaflet')).default;
 
-    // Fix for default markers
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-    });
+      if (!mapInstance) {
+        const map = L.map(mapRef.current).setView([vessel.latitude, vessel.longitude], 8);
 
-    // Initialize map if not already done
-    if (!mapInstance) {
-      const map = L.map(mapRef.current).setView([vessel.latitude, vessel.longitude], 8);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap contributors'
-      }).addTo(map);
+        setMapInstance(map);
+      }
+    };
 
-      setMapInstance(map);
-    }
+    initMap();
   }, [isLoaded, vessel, routeWeather, mapInstance]);
 
   useEffect(() => {
-    if (!mapInstance || !vessel || !routeWeather.length || !window.L) return;
+    if (!mapInstance || !vessel || !routeWeather.length) return;
 
-    const L = window.L;
+    const updateMap = async () => {
+      const L = (await import('leaflet')).default;
 
-    // Clear existing layers
-    mapInstance.eachLayer((layer: any) => {
-      if (layer.options?.attribution) return; // Keep base tiles
-      mapInstance.removeLayer(layer);
-    });
-
-    // Add vessel position marker
-    const vesselIcon = L.divIcon({
-      html: '🚢',
-      iconSize: [30, 30],
-      className: 'vessel-marker'
-    });
-
-    L.marker([vessel.latitude, vessel.longitude], { icon: vesselIcon })
-      .addTo(mapInstance)
-      .bindPopup(`
-        <div style="min-width: 200px;">
-          <h3 style="margin: 0 0 8px 0; font-weight: bold;">${vessel.name}</h3>
-          <div><strong>Position:</strong> ${vessel.latitude.toFixed(4)}, ${vessel.longitude.toFixed(4)}</div>
-          <div><strong>Course:</strong> ${vessel.course}°</div>
-          <div><strong>Speed:</strong> ${vessel.speed} knots</div>
-          ${vessel.destination ? `<div><strong>Destination:</strong> ${vessel.destination}</div>` : ''}
-        </div>
-      `);
-
-    // Add route line if vessel is moving
-    if (showRoute && routeWeather.length > 1) {
-      const routeCoords = routeWeather.map(point => [point.lat, point.lng]);
-
-      // Check if vessel is stationary
-      const isStationary = routeWeather.every(point =>
-        Math.abs(point.lat - vessel.latitude) < 0.001 &&
-        Math.abs(point.lng - vessel.longitude) < 0.001
-      );
-
-      if (!isStationary) {
-        L.polyline(routeCoords, {
-          color: '#2563eb',
-          weight: 3,
-          opacity: 0.7
-        }).addTo(mapInstance);
-      }
-    }
-
-    // Add weather markers along route
-    if (showWeather) {
-      routeWeather.forEach((point, index) => {
-        if (!point.weather) return;
-
-        const weather = point.weather;
-        const windSpeed = weather.windSpeed || 0;
-        const waveHeight = weather.waveHeight || 0;
-
-        // Determine marker color based on conditions
-        let markerColor = '#22c55e'; // Green (good)
-        if (windSpeed > 35 || waveHeight > 4) {
-          markerColor = '#ef4444'; // Red (severe)
-        } else if (windSpeed > 25 || waveHeight > 2) {
-          markerColor = '#f97316'; // Orange (high)
-        } else if (windSpeed > 15 || waveHeight > 1) {
-          markerColor = '#eab308'; // Yellow (medium)
-        }
-
-        // Create weather icon
-        const weatherIcon = L.divIcon({
-          html: `
-            <div style="
-              background-color: ${markerColor};
-              border: 2px solid white;
-              border-radius: 50%;
-              width: 20px;
-              height: 20px;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              font-size: 10px;
-              color: white;
-              font-weight: bold;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            ">
-              ${index + 1}
-            </div>
-          `,
-          iconSize: [20, 20],
-          className: 'weather-marker'
-        });
-
-        const timeStr = new Date(point.estimatedTime).toLocaleDateString() + ' ' +
-                       new Date(point.estimatedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-        L.marker([point.lat, point.lng], { icon: weatherIcon })
-          .addTo(mapInstance)
-          .bindPopup(`
-            <div style="min-width: 250px;">
-              <h4 style="margin: 0 0 8px 0; font-weight: bold;">
-                ${index === 0 ? 'Current Position' :
-                  index === routeWeather.length - 1 ? 'Destination' :
-                  `Waypoint ${index}`}
-              </h4>
-              <div style="margin-bottom: 8px;"><strong>Time:</strong> ${timeStr}</div>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px;">
-                <div><strong>🌬️ Wind:</strong> ${windSpeed.toFixed(1)} kts</div>
-                <div><strong>🌊 Waves:</strong> ${waveHeight.toFixed(1)} m</div>
-                <div><strong>👁️ Visibility:</strong> ${(weather.visibility || 10).toFixed(1)} km</div>
-                <div><strong>🌡️ Temp:</strong> ${(weather.temperature || 20).toFixed(1)}°C</div>
-              </div>
-
-              <div style="margin-top: 8px; font-size: 11px; color: #666;">
-                Source: ${weather.source || 'api'}
-              </div>
-            </div>
-          `);
+      // Clear existing layers
+      mapInstance.eachLayer((layer: any) => {
+        if (layer.options?.attribution) return; // Keep base tiles
+        mapInstance.removeLayer(layer);
       });
-    }
 
-    // Fit map bounds to show all points
-    if (routeWeather.length > 0) {
-      const bounds = L.latLngBounds(routeWeather.map(point => [point.lat, point.lng]));
-      mapInstance.fitBounds(bounds, { padding: [20, 20] });
-    }
+      // Add vessel position marker
+      const vesselIcon = L.divIcon({
+        html: '🚢',
+        iconSize: [30, 30],
+        className: 'vessel-marker'
+      });
+
+      L.marker([vessel.latitude, vessel.longitude], { icon: vesselIcon })
+        .addTo(mapInstance)
+        .bindPopup(`
+          <div style="min-width: 200px;">
+            <h3 style="margin: 0 0 8px 0; font-weight: bold;">${vessel.name}</h3>
+            <div><strong>Position:</strong> ${vessel.latitude.toFixed(4)}, ${vessel.longitude.toFixed(4)}</div>
+            <div><strong>Course:</strong> ${vessel.course}°</div>
+            <div><strong>Speed:</strong> ${vessel.speed} knots</div>
+            ${vessel.destination ? `<div><strong>Destination:</strong> ${vessel.destination}</div>` : ''}
+          </div>
+        `);
+
+      // Add route line if vessel is moving
+      if (showRoute && routeWeather.length > 1) {
+        const routeCoords = routeWeather.map(point => [point.lat, point.lng]);
+
+        // Check if vessel is stationary
+        const isStationary = routeWeather.every(point =>
+          Math.abs(point.lat - vessel.latitude) < 0.001 &&
+          Math.abs(point.lng - vessel.longitude) < 0.001
+        );
+
+        if (!isStationary) {
+          L.polyline(routeCoords, {
+            color: '#2563eb',
+            weight: 3,
+            opacity: 0.7
+          }).addTo(mapInstance);
+        }
+      }
+
+      // Add weather markers along route
+      if (showWeather) {
+        routeWeather.forEach((point, index) => {
+          if (!point.weather) return;
+
+          const weather = point.weather;
+          const windSpeed = weather.windSpeed || 0;
+          const waveHeight = weather.waveHeight || 0;
+
+          // Determine marker color based on conditions
+          let markerColor = '#22c55e'; // Green (good)
+          if (windSpeed > 35 || waveHeight > 4) {
+            markerColor = '#ef4444'; // Red (severe)
+          } else if (windSpeed > 25 || waveHeight > 2) {
+            markerColor = '#f97316'; // Orange (high)
+          } else if (windSpeed > 15 || waveHeight > 1) {
+            markerColor = '#eab308'; // Yellow (medium)
+          }
+
+          // Create weather icon
+          const weatherIcon = L.divIcon({
+            html: `
+              <div style="
+                background-color: ${markerColor};
+                border: 2px solid white;
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 10px;
+                color: white;
+                font-weight: bold;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+              ">
+                ${index + 1}
+              </div>
+            `,
+            iconSize: [20, 20],
+            className: 'weather-marker'
+          });
+
+          const timeStr = new Date(point.estimatedTime).toLocaleDateString() + ' ' +
+                         new Date(point.estimatedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+          L.marker([point.lat, point.lng], { icon: weatherIcon })
+            .addTo(mapInstance)
+            .bindPopup(`
+              <div style="min-width: 250px;">
+                <h4 style="margin: 0 0 8px 0; font-weight: bold;">
+                  ${index === 0 ? 'Current Position' :
+                    index === routeWeather.length - 1 ? 'Destination' :
+                    `Waypoint ${index}`}
+                </h4>
+                <div style="margin-bottom: 8px;"><strong>Time:</strong> ${timeStr}</div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px;">
+                  <div><strong>🌬️ Wind:</strong> ${windSpeed.toFixed(1)} kts</div>
+                  <div><strong>🌊 Waves:</strong> ${waveHeight.toFixed(1)} m</div>
+                  <div><strong>👁️ Visibility:</strong> ${(weather.visibility || 10).toFixed(1)} km</div>
+                  <div><strong>🌡️ Temp:</strong> ${(weather.temperature || 20).toFixed(1)}°C</div>
+                </div>
+
+                <div style="margin-top: 8px; font-size: 11px; color: #666;">
+                  Source: ${weather.source || 'api'}
+                </div>
+              </div>
+            `);
+        });
+      }
+
+      // Fit map bounds to show all points
+      if (routeWeather.length > 0) {
+        const bounds = L.latLngBounds(routeWeather.map(point => [point.lat, point.lng]));
+        mapInstance.fitBounds(bounds, { padding: [20, 20] });
+      }
+    };
+
+    updateMap();
   }, [mapInstance, vessel, routeWeather, showWeather, showRoute]);
 
   if (!isLoaded) {
@@ -269,7 +271,7 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
               />
 
               {/* Legend */}
-              <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border text-xs">
+              <div className="absolute bottom-4 left-4 bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border text-xs z-[1000]">
                 <h4 className="font-semibold mb-2">Legend</h4>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
