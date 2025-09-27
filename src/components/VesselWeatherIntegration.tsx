@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Ship, MapPin, Clock, Search, Anchor, Cloud, Navigation, Calendar, Radio, Gauge, Play, Shuffle } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Ship, MapPin, Clock, Search, Anchor, Cloud, Navigation, Calendar, Radio, Gauge, Play, Shuffle, AlertCircle, Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchDataDockedVessels, fetchAllWeatherData, getApiKeys } from "@/services/apiService";
 import { VesselWeatherDisplay } from "./VesselWeatherDisplay";
@@ -58,7 +59,11 @@ interface RouteAnalysisData {
   recommendations: string[];
 }
 
-export const VesselWeatherIntegration = () => {
+interface VesselWeatherIntegrationProps {
+  onNavigateToSetup?: () => void;
+}
+
+export const VesselWeatherIntegration = ({ onNavigateToSetup }: VesselWeatherIntegrationProps) => {
   const [vessels, setVessels] = useState<Vessel[]>([]);
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
@@ -67,6 +72,10 @@ export const VesselWeatherIntegration = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isFetchingWeather, setIsFetchingWeather] = useState(false);
+  const [hasApiKeys, setHasApiKeys] = useState<{datadocked: boolean, weatherApis: boolean}>({
+    datadocked: false,
+    weatherApis: false
+  });
   const { toast } = useToast();
 
   // Demo vessel data - SAMPLE DATA FOR DEMONSTRATION
@@ -95,7 +104,26 @@ export const VesselWeatherIntegration = () => {
     unlocode_lastport: "NLRTM"
   };
 
-  // Don't auto-load demo vessel anymore - make search primary
+  // Check for API keys on mount
+  useEffect(() => {
+    const checkApiKeys = () => {
+      const apiKeys = getApiKeys();
+      if (apiKeys) {
+        const hasDatadocked = !!apiKeys.datadocked && apiKeys.datadocked.trim() !== '';
+        const hasWeatherApi = (
+          (!!apiKeys.weatherapi && apiKeys.weatherapi.trim() !== '') ||
+          (!!apiKeys.stormglass && apiKeys.stormglass.trim() !== '') ||
+          (!!apiKeys.openweathermap && apiKeys.openweathermap.trim() !== '') ||
+          (!!apiKeys.windy && apiKeys.windy.trim() !== '')
+        );
+        setHasApiKeys({
+          datadocked: hasDatadocked,
+          weatherApis: hasWeatherApi
+        });
+      }
+    };
+    checkApiKeys();
+  }, []);
 
   const searchVessels = async () => {
     if (!searchQuery.trim()) return;
@@ -248,9 +276,50 @@ export const VesselWeatherIntegration = () => {
 
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-      {/* Left Sidebar - Search & Controls */}
-      <div className="lg:col-span-4 space-y-6">
+    <div className="space-y-6">
+      {/* API Key Warning */}
+      {(!hasApiKeys.datadocked || !hasApiKeys.weatherApis) && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-900">API Configuration Required</AlertTitle>
+          <AlertDescription className="text-amber-800 space-y-2">
+            <div>
+              To use Weather Docked, you need to configure:
+            </div>
+            <ul className="list-disc list-inside space-y-1 mt-2">
+              {!hasApiKeys.datadocked && (
+                <li>
+                  <strong>DataDocked API key</strong> - Required for vessel tracking
+                </li>
+              )}
+              {!hasApiKeys.weatherApis && (
+                <li>
+                  <strong>At least one weather API key</strong> - Required for weather analysis (WeatherAPI, StormGlass, OpenWeatherMap, or Windy)
+                </li>
+              )}
+            </ul>
+            <div className="mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-amber-300 hover:bg-amber-100"
+                onClick={() => {
+                  if (onNavigateToSetup) {
+                    onNavigateToSetup();
+                  }
+                }}
+              >
+                <Settings className="h-4 w-4" />
+                Configure API Keys
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Sidebar - Search & Controls */}
+        <div className="lg:col-span-4 space-y-6">
         {/* Primary Vessel Search */}
         <Card className="border-border">
           <CardHeader className="pb-4 bg-primary/5 border-b border-primary/10">
@@ -602,6 +671,7 @@ export const VesselWeatherIntegration = () => {
           </Card>
         )}
       </div>
+    </div>
     </div>
   );
 };

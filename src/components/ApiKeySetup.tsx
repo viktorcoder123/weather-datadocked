@@ -140,33 +140,37 @@ export const ApiKeySetup = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="space-y-6">
       <div className="text-center space-y-2">
-        <h2 className="text-3xl font-bold text-maritime-deep">API Configuration</h2>
-        <p className="text-muted-foreground">
+        <h2 className="text-3xl font-bold text-primary">API Configuration</h2>
+        <p className="text-muted-foreground text-lg">
           Configure your API keys to integrate vessel tracking and weather data
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {apiConfigs.map(({ key, title, description, icon: Icon, url, placeholder }) => (
-          <Card key={key} className="border-maritime-medium/20">
-            <CardHeader>
-              <CardTitle className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Icon className="h-5 w-5 text-maritime-medium" />
-                  {title}
+          <Card key={key} className="border-border hover:border-primary/30 transition-colors flex flex-col">
+            <CardHeader className="pb-4 flex-1">
+              <CardTitle className="flex items-center justify-between text-base">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-primary/10">
+                    <Icon className="h-5 w-5 text-primary" />
+                  </div>
+                  <span className="font-semibold">{title}</span>
                 </div>
                 <Button variant="ghost" size="sm" asChild>
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="gap-1">
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="gap-1 hover:text-primary">
                     <ExternalLink className="h-4 w-4" />
                   </a>
                 </Button>
               </CardTitle>
-              <CardDescription>{description}</CardDescription>
+              <CardDescription className="text-sm mt-2 ml-12 min-h-[2.5rem]">
+                {description}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <Label htmlFor={key}>API Key</Label>
+            <CardContent className="space-y-3 pt-4">
+              <Label htmlFor={key} className="text-sm font-medium">API Key</Label>
               <div className="relative">
                 <Input
                   id={key}
@@ -174,7 +178,7 @@ export const ApiKeySetup = () => {
                   placeholder={placeholder}
                   value={apiKeys[key]}
                   onChange={(e) => handleInputChange(key, e.target.value)}
-                  className="pr-10"
+                  className="pr-10 h-11 text-base font-mono"
                 />
                 <Button
                   type="button"
@@ -198,11 +202,12 @@ export const ApiKeySetup = () => {
         ))}
       </div>
 
-      <div className="flex justify-center">
+      <div className="flex justify-center pt-4">
         <Button
           onClick={handleSaveKeys}
           disabled={isLoading || !Object.values(apiKeys).some(key => key.trim())}
-          className="min-w-32"
+          className="min-w-[200px] h-12 text-base bg-primary hover:bg-primary/90"
+          size="lg"
         >
           {isLoading ? "Saving..." : "Save API Keys"}
         </Button>

@@ -40,7 +40,7 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-8">
         {activeTab === "setup" ? (
-          <div className="max-w-2xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <div className="bg-card rounded-xl border border-border p-8">
               <ApiKeySetup />
             </div>
@@ -68,7 +68,7 @@ const Index = () => {
             </div>
 
             {/* Main Integration */}
-            <VesselWeatherIntegration />
+            <VesselWeatherIntegration onNavigateToSetup={() => setActiveTab("setup")} />
           </div>
         )}
       </main>
@@ -78,7 +78,7 @@ const Index = () => {
         <div className="container mx-auto px-4">
           <div className="text-center">
             <p className="text-sm text-muted-foreground">
-              © 2024 Weather Docked • Powered by{" "}
+              © 2025 Weather Docked • Powered by{" "}
               <a
                 href="https://datadocked.com"
                 target="_blank"
