@@ -57,6 +57,13 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        maritime: {
+          deep: "hsl(var(--ocean-deep))",
+          medium: "hsl(var(--ocean-medium))",
+          light: "hsl(var(--ocean-light))",
+          wave: "hsl(var(--wave))",
+          accent: "hsl(var(--maritime-accent))",
+        },
       },
       borderRadius: {
         lg: "var(--radius)",
