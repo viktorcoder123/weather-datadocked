@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Cloud, Wind, Waves, Thermometer, Eye, MapPin } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface WeatherData {
   location: {
@@ -49,15 +50,13 @@ export const WeatherDashboard = () => {
 
     setIsLoading(true);
     try {
-      const response = await fetch(
-        `/api/weather-data?lat=${coordinates.lat}&lng=${coordinates.lng}`
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setWeatherData(data);
-      } else {
-        throw new Error("Failed to fetch weather data");
-      }
+      const { data, error } = await supabase.functions.invoke('weather-data', {
+        body: { lat: coordinates.lat, lng: coordinates.lng }
+      });
+
+      if (error) throw error;
+      
+      setWeatherData(data);
     } catch (error) {
       toast({
         title: "Error",

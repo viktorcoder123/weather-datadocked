@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Eye, EyeOff, ExternalLink, Ship, Cloud, Wind, MapPin } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ApiKeyData {
   datadocked: string;
@@ -29,6 +30,30 @@ export const ApiKeySetup = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
+  useEffect(() => {
+    loadApiKeys();
+  }, []);
+
+  const loadApiKeys = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('api_keys')
+        .select('*')
+        .single();
+
+      if (data && !error) {
+        setApiKeys({
+          datadocked: data.datadocked_api_key || "",
+          stormglass: data.stormglass_api_key || "",
+          weatherapi: data.weatherapi_key || "",
+          windy: data.windy_api_key || ""
+        });
+      }
+    } catch (error) {
+      console.log('No existing API keys found');
+    }
+  };
+
   const handleInputChange = (key: keyof ApiKeyData, value: string) => {
     setApiKeys(prev => ({ ...prev, [key]: value }));
   };
@@ -40,21 +65,33 @@ export const ApiKeySetup = () => {
   const handleSaveKeys = async () => {
     setIsLoading(true);
     try {
-      // Here we'll call our edge function to save the API keys
-      const response = await fetch("/api/save-api-keys", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(apiKeys),
-      });
-
-      if (response.ok) {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
         toast({
-          title: "Success",
-          description: "API keys have been saved securely.",
+          title: "Error",
+          description: "Please sign in to save API keys.",
+          variant: "destructive",
         });
-      } else {
-        throw new Error("Failed to save API keys");
+        return;
       }
+
+      const { error } = await supabase
+        .from('api_keys')
+        .upsert({
+          user_id: user.id,
+          datadocked_api_key: apiKeys.datadocked,
+          stormglass_api_key: apiKeys.stormglass,
+          weatherapi_key: apiKeys.weatherapi,
+          windy_api_key: apiKeys.windy
+        });
+
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "API keys have been saved securely.",
+      });
     } catch (error) {
       toast({
         title: "Error",

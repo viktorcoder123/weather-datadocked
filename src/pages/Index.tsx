@@ -3,8 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Settings, Ship, Cloud, Waves } from "lucide-react";
 import { ApiKeySetup } from "@/components/ApiKeySetup";
-import { VesselDashboard } from "@/components/VesselDashboard";
-import { WeatherDashboard } from "@/components/WeatherDashboard";
+import { VesselWeatherIntegration } from "@/components/VesselWeatherIntegration";
 
 const Index = () => {
   const [activeTab, setActiveTab] = useState<"dashboard" | "setup">("dashboard");
@@ -83,10 +82,7 @@ const Index = () => {
             </div>
 
             {/* Main Content */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <VesselDashboard />
-              <WeatherDashboard />
-            </div>
+            <VesselWeatherIntegration />
           </div>
         )}
       </main>

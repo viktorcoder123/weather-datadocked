@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Ship, MapPin, Clock, Search, Anchor } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface Vessel {
   id: string;
@@ -31,13 +32,13 @@ export const VesselDashboard = () => {
     
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/search-vessels?query=${encodeURIComponent(searchQuery)}`);
-      if (response.ok) {
-        const data = await response.json();
-        setVessels(data.vessels || []);
-      } else {
-        throw new Error("Failed to search vessels");
-      }
+      const { data, error } = await supabase.functions.invoke('search-vessels', {
+        body: { query: searchQuery }
+      });
+
+      if (error) throw error;
+      
+      setVessels(data?.vessels || []);
     } catch (error) {
       toast({
         title: "Error",

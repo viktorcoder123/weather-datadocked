@@ -14,7 +14,39 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      api_keys: {
+        Row: {
+          created_at: string
+          datadocked_api_key: string | null
+          id: string
+          stormglass_api_key: string | null
+          updated_at: string
+          user_id: string
+          weatherapi_key: string | null
+          windy_api_key: string | null
+        }
+        Insert: {
+          created_at?: string
+          datadocked_api_key?: string | null
+          id?: string
+          stormglass_api_key?: string | null
+          updated_at?: string
+          user_id: string
+          weatherapi_key?: string | null
+          windy_api_key?: string | null
+        }
+        Update: {
+          created_at?: string
+          datadocked_api_key?: string | null
+          id?: string
+          stormglass_api_key?: string | null
+          updated_at?: string
+          user_id?: string
+          weatherapi_key?: string | null
+          windy_api_key?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
