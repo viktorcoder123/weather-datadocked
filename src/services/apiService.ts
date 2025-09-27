@@ -46,6 +46,10 @@ export const fetchDataDockedVessel = async (imoOrMmsi: string) => {
     // Transform DataDocked response to our format
     if (data.detail) {
       const vessel = data.detail;
+
+      // Debug: Log all available fields to understand the API response structure
+      console.log('DataDocked vessel fields:', Object.keys(vessel));
+      console.log('DataDocked vessel data:', vessel);
       return {
         id: vessel.imo || vessel.mmsi,
         name: vessel.name,
@@ -59,6 +63,8 @@ export const fetchDataDockedVessel = async (imoOrMmsi: string) => {
         lastUpdate: vessel.updateTime,
         destination: vessel.destination,
         lastPort: vessel.lastPort,
+        unlocode_destination: vessel.unlocode_destination || vessel.destinationUnlocode || vessel.destination_unlocode,
+        unlocode_lastport: vessel.unlocode_lastport || vessel.lastPortUnlocode || vessel.last_port_unlocode,
         eta: vessel.etaUtc,
         atd: vessel.atdUtc,
         callsign: vessel.callsign,

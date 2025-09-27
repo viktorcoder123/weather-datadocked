@@ -100,46 +100,27 @@ export const projectPoint = (lat: number, lon: number, bearing: number, distance
 };
 
 // Parse destination coordinates from destination string
-export const parseDestinationCoordinates = (destination: string): { lat: number; lng: number } | null => {
-  // Common port coordinates - in production, this would be a comprehensive database
-  const portCoordinates: Record<string, { lat: number; lng: number }> = {
-    'Portsmouth, United Kingdom (UK)': { lat: 50.8198, lng: -1.0880 },
-    'Portsmouth': { lat: 50.8198, lng: -1.0880 },
-    'Southampton': { lat: 50.9097, lng: -1.4044 },
-    'London': { lat: 51.5074, lng: -0.1278 },
-    'Hamburg': { lat: 53.5511, lng: 9.9937 },
-    'Rotterdam': { lat: 51.9244, lng: 4.4777 },
-    'Amsterdam': { lat: 52.3676, lng: 4.9041 },
-    'Amsterdam, Netherlands': { lat: 52.3676, lng: 4.9041 },
-    'Antwerp': { lat: 51.2194, lng: 4.4025 },
-    'Le Havre': { lat: 49.4944, lng: 0.1079 },
-    'Bilbao': { lat: 43.2627, lng: -2.9253 },
-    'Barcelona': { lat: 41.3851, lng: 2.1734 },
-    'Marseille': { lat: 43.2965, lng: 5.3698 },
-    'Genoa': { lat: 44.4056, lng: 8.9463 },
-    'Naples': { lat: 40.8518, lng: 14.2681 },
-    'Piraeus': { lat: 37.9472, lng: 23.6348 },
-    'Istanbul': { lat: 41.0082, lng: 28.9784 },
-    'Tallinn': { lat: 59.4370, lng: 24.7536 },
-    'Tallinn, Estonia': { lat: 59.4370, lng: 24.7536 },
-    'Cleveland': { lat: 41.4993, lng: -81.6944 },
-    'Cleveland, United States': { lat: 41.4993, lng: -81.6944 },
-    'Cleveland, United States (USA)': { lat: 41.4993, lng: -81.6944 }
-  };
+export const parseDestinationCoordinates = async (destination: string): Promise<{ lat: number; lng: number } | null> => {
+  // Use the Supabase port lookup service instead of hardcoded coordinates
+  try {
+    const { searchPorts } = await import('./portService');
+    const ports = await searchPorts(destination);
 
-  // Try to find exact match first
-  const exactMatch = portCoordinates[destination];
-  if (exactMatch) return exactMatch;
-
-  // Try to find partial match
-  for (const [port, coords] of Object.entries(portCoordinates)) {
-    if (destination.toLowerCase().includes(port.toLowerCase()) ||
-        port.toLowerCase().includes(destination.toLowerCase())) {
-      return coords;
+    if (ports && ports.length > 0) {
+      const port = ports[0]; // Take the first/best match
+      console.log('Found port via Supabase:', port);
+      return {
+        lat: port.latitude,
+        lng: port.longitude
+      };
     }
-  }
 
-  return null;
+    console.log('No port found in Supabase for:', destination);
+    return null;
+  } catch (error) {
+    console.error('Error looking up port coordinates:', error);
+    return null;
+  }
 };
 
 // Fetch route from Python searoute service
@@ -152,7 +133,7 @@ export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RouteP
 
   if (isStationary || !hasDestination) {
     console.log('Vessel is stationary or has no destination, generating local forecast waypoints');
-    const route = projectVesselRouteGreatCircle(vessel);
+    const route = await projectVesselRouteGreatCircle(vessel);
     return { route, type: 'stationary-forecast' as any };
   }
 
@@ -200,7 +181,7 @@ export const fetchMaritimeRoute = async (vessel: Vessel): Promise<{route: RouteP
 
   } catch (error) {
     console.warn('Searoute service unavailable, falling back to great circle route:', error);
-    const route = projectVesselRouteGreatCircle(vessel);
+    const route = await projectVesselRouteGreatCircle(vessel);
     return { route, type: 'great-circle' };
   }
 };
@@ -264,7 +245,7 @@ const parseVesselETA = (etaString: string): Date | null => {
 };
 
 // Fallback: Project vessel route using great circle calculation (original method)
-export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
+export const projectVesselRouteGreatCircle = async (vessel: Vessel): Promise<RoutePoint[]> => {
   const route: RoutePoint[] = [];
   const currentTime = new Date();
 
@@ -308,10 +289,28 @@ export const projectVesselRouteGreatCircle = (vessel: Vessel): RoutePoint[] => {
 
   // If we have a destination, calculate route to destination
   let destinationCoords = null;
-  if (vessel.destination) {
-    console.log('Attempting to parse destination:', vessel.destination);
-    destinationCoords = parseDestinationCoordinates(vessel.destination);
+  // Prioritize UNLOCODE destination, then fall back to regular destination
+  const destinationToUse = vessel.unlocode_destination || vessel.destination;
+
+  console.log('Route analysis destination logic:', {
+    vessel_unlocode_destination: vessel.unlocode_destination,
+    vessel_regular_destination: vessel.destination,
+    destinationToUse: destinationToUse,
+    willUseUnlocode: !!vessel.unlocode_destination,
+    vesselSpeed: vessel.speed,
+    isStationary: vessel.speed <= 1
+  });
+
+  if (destinationToUse) {
+    console.log('Attempting to parse destination:', destinationToUse, {
+      unlocode_destination: vessel.unlocode_destination,
+      regular_destination: vessel.destination,
+      using: vessel.unlocode_destination ? 'UNLOCODE' : 'regular destination'
+    });
+    destinationCoords = await parseDestinationCoordinates(destinationToUse);
     console.log('Parsed destination coordinates:', destinationCoords);
+  } else {
+    console.log('No destination provided - neither UNLOCODE nor regular destination available');
   }
 
   if (isStationary) {
