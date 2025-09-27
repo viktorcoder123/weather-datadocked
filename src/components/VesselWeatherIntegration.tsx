@@ -1,9 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Ship, MapPin, Clock, Search, Anchor, Cloud, Navigation, Calendar, Radio, Gauge } from "lucide-react";
+import { Ship, MapPin, Clock, Search, Anchor, Cloud, Navigation, Calendar, Radio, Gauge, Play, Shuffle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { fetchDataDockedVessels, fetchAllWeatherData, getApiKeys } from "@/services/apiService";
 import { VesselWeatherDisplay } from "./VesselWeatherDisplay";
@@ -68,6 +68,34 @@ export const VesselWeatherIntegration = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [isFetchingWeather, setIsFetchingWeather] = useState(false);
   const { toast } = useToast();
+
+  // Demo vessel data - SAMPLE DATA FOR DEMONSTRATION
+  const demoVessel: Vessel = {
+    id: "demo-9856189",
+    name: "AMSTERDAM BRIDGE (DEMO)",
+    imo: "9856189",
+    mmsi: "244670000",
+    type: "Container Ship",
+    latitude: 52.763,
+    longitude: 4.085,
+    speed: 11.7,
+    course: 45,
+    status: "Under way using engine",
+    lastUpdate: "2025-09-27T14:30:00.000Z", // Fixed demo date
+    destination: "DEBRV",
+    lastPort: "NLRTM",
+    eta: "DEMO: Sample vessel data",
+    etaUtc: "2025-09-28T02:00:00.000Z",
+    callsign: "PHLB",
+    draught: "13.2 m",
+    navigationalStatus: "Under way using engine",
+    positionReceived: "2025-09-27T14:30:00.000Z",
+    updateTime: "2025-09-27T14:30:00.000Z",
+    unlocode_destination: "DEBRV",
+    unlocode_lastport: "NLRTM"
+  };
+
+  // Don't auto-load demo vessel anymore - make search primary
 
   const searchVessels = async () => {
     if (!searchQuery.trim()) return;
@@ -220,258 +248,360 @@ export const VesselWeatherIntegration = () => {
 
 
   return (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h2 className="text-3xl font-bold text-maritime-deep">Vessel & Weather Integration</h2>
-        <p className="text-muted-foreground">
-          Search for vessels and get real-time weather conditions at their location
-        </p>
-      </div>
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      {/* Left Sidebar - Search & Controls */}
+      <div className="lg:col-span-4 space-y-6">
+        {/* Primary Vessel Search */}
+        <Card className="border-border">
+          <CardHeader className="pb-4 bg-primary/5 border-b border-primary/10">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-3 text-foreground text-xl">
+                <Search className="h-5 w-5 text-primary" />
+                Vessel Search
+              </CardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 border-amber-500/30 hover:bg-amber-50 text-amber-700"
+                onClick={() => {
+                  setSelectedVessel(demoVessel);
+                  fetchWeatherForVessel(demoVessel);
+                  toast({
+                    title: "Demo Mode",
+                    description: "Loading sample vessel data for demonstration. This is not live data.",
+                    className: "border-amber-500 bg-amber-50"
+                  });
+                }}
+              >
+                <Play className="h-4 w-4" />
+                Sample Data
+              </Button>
+            </div>
+            <CardDescription className="text-sm mt-2">
+              Enter vessel IMO, MMSI, or name to analyze weather conditions
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="Enter IMO (e.g., 9856189) or vessel name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyPress={(e) => e.key === "Enter" && searchVessels()}
+                className="flex-1 h-12 text-base"
+              />
+              <Button
+                onClick={searchVessels}
+                disabled={isSearching}
+                className="h-12 px-6 bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                {isSearching ? "Searching..." : "Search"}
+              </Button>
+            </div>
 
-      {/* Vessel Search */}
-      <Card className="border-maritime-medium/20">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Ship className="h-5 w-5 text-maritime-medium" />
-            Vessel Search
-          </CardTitle>
-          <CardDescription>
-            Search by vessel name, IMO, or MMSI number
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-2">
-            <Input
-              placeholder="Enter vessel IMO or MMSI number (e.g., 9856189)"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && searchVessels()}
-              className="flex-1"
-            />
-            <Button onClick={searchVessels} disabled={isSearching} className="gap-2">
-              <Search className="h-4 w-4" />
-              {isSearching ? "Searching..." : "Search"}
-            </Button>
-          </div>
-
-          {vessels.length > 0 && (
-            <div className="space-y-3 max-h-96 overflow-y-auto">
-              {vessels.map((vessel) => (
-                <Card key={vessel.id} className="p-4 cursor-pointer hover:bg-accent/50 transition-colors"
-                      onClick={() => fetchWeatherForVessel(vessel)}>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-semibold text-maritime-deep text-lg">{vessel.name}</h4>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(vessel.navigationalStatus || vessel.status)}>
-                          {vessel.navigationalStatus || vessel.status}
-                        </Badge>
+            {vessels.length > 0 && (
+              <div className="space-y-3 max-h-80 overflow-y-auto">
+                <div className="text-sm font-medium text-muted-foreground">
+                  Found {vessels.length} vessel{vessels.length !== 1 ? 's' : ''}:
+                </div>
+                {vessels.map((vessel) => (
+                  <Card
+                    key={vessel.id}
+                    className="p-4 cursor-pointer hover:bg-muted/50 transition-colors border"
+                    onClick={() => fetchWeatherForVessel(vessel)}
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h5 className="font-semibold">{vessel.name}</h5>
                         {selectedVessel?.id === vessel.id && (
                           <Badge variant="secondary">Selected</Badge>
                         )}
                       </div>
-                    </div>
-
-                    {/* Primary Vessel Information */}
-                    <div className="grid grid-cols-3 gap-3 text-sm">
-                      <div className="p-2 bg-accent/30 rounded">
-                        <div className="font-medium text-maritime-deep">IMO</div>
-                        <div className="text-muted-foreground">{vessel.imo}</div>
-                      </div>
-                      <div className="p-2 bg-accent/30 rounded">
-                        <div className="font-medium text-maritime-deep">MMSI</div>
-                        <div className="text-muted-foreground">{vessel.mmsi}</div>
-                      </div>
-                      <div className="p-2 bg-accent/30 rounded">
-                        <div className="font-medium text-maritime-deep flex items-center gap-1">
-                          <Radio className="h-3 w-3" />
-                          Callsign
-                        </div>
-                        <div className="text-muted-foreground">{vessel.callsign || "N/A"}</div>
+                      <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                        <div>IMO: {vessel.imo}</div>
+                        <div>Speed: {vessel.speed} kts</div>
+                        <div>MMSI: {vessel.mmsi}</div>
+                        <div>Type: {vessel.type}</div>
                       </div>
                     </div>
-
-                    {/* Position & Navigation */}
-                    <div className="grid grid-cols-3 gap-3 text-sm">
-                      <div className="p-2 bg-accent/30 rounded">
-                        <div className="font-medium text-maritime-deep flex items-center gap-1">
-                          <MapPin className="h-3 w-3" />
-                          Position
-                        </div>
-                        <div className="text-muted-foreground">
-                          {vessel.latitude.toFixed(4)}, {vessel.longitude.toFixed(4)}
-                        </div>
-                      </div>
-                      <div className="p-2 bg-accent/30 rounded">
-                        <div className="font-medium text-maritime-deep flex items-center gap-1">
-                          <Navigation className="h-3 w-3" />
-                          Course
-                        </div>
-                        <div className="text-muted-foreground">
-                          {vessel.course}°
-                        </div>
-                      </div>
-                      <div className="p-2 bg-accent/30 rounded">
-                        <div className="font-medium text-maritime-deep flex items-center gap-1">
-                          <Anchor className="h-3 w-3" />
-                          Speed
-                        </div>
-                        <div className="text-muted-foreground">
-                          {vessel.speed} kts
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Vessel Details */}
-                    {vessel.draught && (
-                      <div className="grid grid-cols-1 gap-2 text-sm">
-                        <div className="p-2 bg-accent/30 rounded">
-                          <div className="font-medium text-maritime-deep flex items-center gap-1">
-                            <Gauge className="h-3 w-3" />
-                            Draught
-                          </div>
-                          <div className="text-muted-foreground">{vessel.draught}</div>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Ports & Schedule */}
-                    {(vessel.destination || vessel.lastPort) && (
-                      <div className="grid grid-cols-1 gap-2 text-sm">
-                        {vessel.destination && (
-                          <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                            <div className="font-medium text-blue-900 dark:text-blue-300">Destination</div>
-                            <div className="text-blue-700 dark:text-blue-400">{vessel.destination}</div>
-                            {vessel.unlocode_destination && (
-                              <div className="text-xs text-blue-600 dark:text-blue-500 mt-1">
-                                UNLOCODE: {vessel.unlocode_destination}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        {vessel.lastPort && (
-                          <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
-                            <div className="font-medium text-green-900 dark:text-green-300">Last Port</div>
-                            <div className="text-green-700 dark:text-green-400">{vessel.lastPort}</div>
-                            {vessel.unlocode_lastport && (
-                              <div className="text-xs text-green-600 dark:text-green-500 mt-1">
-                                UNLOCODE: {vessel.unlocode_lastport}
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* ETA & ATD */}
-                    {(vessel.etaUtc || vessel.eta || vessel.atdUtc || vessel.atd) && (
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        {(vessel.etaUtc || vessel.eta) && (
-                          <div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded border border-orange-200 dark:border-orange-800">
-                            <div className="font-medium text-orange-900 dark:text-orange-300 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              ETA
-                            </div>
-                            <div className="text-orange-700 dark:text-orange-400 text-xs">
-                              {vessel.etaUtc || vessel.eta}
-                            </div>
-                          </div>
-                        )}
-                        {(vessel.atdUtc || vessel.atd) && (
-                          <div className="p-2 bg-purple-50 dark:bg-purple-900/20 rounded border border-purple-200 dark:border-purple-800">
-                            <div className="font-medium text-purple-900 dark:text-purple-300 flex items-center gap-1">
-                              <Calendar className="h-3 w-3" />
-                              ATD
-                            </div>
-                            <div className="text-purple-700 dark:text-purple-400 text-xs">
-                              {vessel.atdUtc || vessel.atd}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Position Update Info */}
-                    <div className="flex justify-between items-center text-xs text-muted-foreground border-t pt-2">
-                      {vessel.positionReceived && (
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          Position: {vessel.positionReceived}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        Updated: {new Date(vessel.updateTime || vessel.lastUpdate).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                </Card>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Weather Data Display */}
-      {selectedVessel && (
-        <Card className="border-maritime-medium/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Cloud className="h-5 w-5 text-maritime-medium" />
-              Weather at {selectedVessel.name}
-            </CardTitle>
-            <CardDescription>
-              Current weather and marine conditions at vessel location
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <VesselWeatherDisplay weatherData={weatherData} isFetchingWeather={isFetchingWeather} />
+                  </Card>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
-      )}
 
-      {/* Route Analysis */}
-      {selectedVessel && weatherData && (
-        <RouteAnalysisComponent
-          vessel={selectedVessel}
-          weatherData={weatherData}
-          onAnalysisComplete={(analysis: RouteAnalysisData) => setRouteAnalysis(analysis)}
-        />
-      )}
+        {/* Comprehensive Vessel Overview */}
+        {selectedVessel && (
+          <Card className="border-border">
+            <CardHeader className="pb-3 bg-muted/30 border-b">
+              <CardTitle className="flex items-center gap-2">
+                <Ship className="h-5 w-5 text-primary" />
+                Vessel Details
+              </CardTitle>
+              <CardDescription>
+                Confirm vessel identity and current status
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 pt-4">
+              {/* Demo Warning if applicable */}
+              {selectedVessel.id === "demo-9856189" && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-amber-800 text-sm font-medium">
+                    <Play className="h-4 w-4" />
+                    Demo Mode - Sample Data
+                  </div>
+                  <p className="text-amber-700 text-xs mt-1">
+                    This is demonstration data from September 2025. Search for a real vessel for live data.
+                  </p>
+                </div>
+              )}
 
-      {/* Weather-Aware Routing */}
-      {selectedVessel && routeAnalysis && (
-        <WeatherAwareRouting
-          vessel={selectedVessel}
-          routeAnalysis={routeAnalysis}
-          onRouteSelected={(route) => {
-            console.log('Selected weather-aware route:', route);
-            setSelectedAlternativeRoute(route);
-            toast({
-              title: "Alternative Route Selected",
-              description: `${route.type === 'primary' ? 'Direct' : route.type} route selected. Map updated.`,
-            });
-          }}
-        />
-      )}
+              {/* Vessel Header */}
+              <div className="p-4 bg-muted/50 rounded-lg border">
+                <div className="flex items-center justify-between mb-2">
+                  <h4 className="font-bold text-lg">{selectedVessel.name}</h4>
+                  <Badge className={getStatusColor(selectedVessel.navigationalStatus || selectedVessel.status)}>
+                    {selectedVessel.navigationalStatus || selectedVessel.status}
+                  </Badge>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {selectedVessel.type} • Last updated: {new Date(selectedVessel.updateTime || selectedVessel.lastUpdate).toLocaleString()}
+                </div>
+              </div>
 
-      {/* Route Weather Timeline */}
-      {selectedVessel && routeAnalysis && routeAnalysis.projectedRoute && (
-        <RouteWeatherTimeline
-          routeWeather={routeAnalysis.projectedRoute}
-          vesselName={selectedVessel.name}
-        />
-      )}
+              {/* Primary Vessel Information */}
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="p-3 bg-background rounded-lg border">
+                  <div className="font-medium text-muted-foreground text-xs">IMO</div>
+                  <div className="font-mono mt-1">{selectedVessel.imo}</div>
+                </div>
+                <div className="p-3 bg-background rounded-lg border">
+                  <div className="font-medium text-muted-foreground text-xs">MMSI</div>
+                  <div className="font-mono mt-1">{selectedVessel.mmsi}</div>
+                </div>
+                <div className="p-3 bg-background rounded-lg border">
+                  <div className="font-medium text-muted-foreground text-xs flex items-center gap-1">
+                    <Radio className="h-3 w-3" />
+                    CALLSIGN
+                  </div>
+                  <div className="font-mono mt-1">{selectedVessel.callsign || "N/A"}</div>
+                </div>
+              </div>
 
-      {/* Interactive Map */}
-      {selectedVessel && routeAnalysis && routeAnalysis.projectedRoute && (
-        <RouteMap
-          vessel={selectedVessel}
-          routeWeather={routeAnalysis.projectedRoute}
-          analysis={routeAnalysis}
-          alternativeRoute={selectedAlternativeRoute}
-        />
-      )}
+              {/* Position & Navigation */}
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="p-3 bg-background rounded-lg border">
+                  <div className="font-medium text-muted-foreground text-xs flex items-center gap-1">
+                    <MapPin className="h-3 w-3" />
+                    POSITION
+                  </div>
+                  <div className="mt-1">
+                    {selectedVessel.latitude.toFixed(4)}, {selectedVessel.longitude.toFixed(4)}
+                  </div>
+                </div>
+                <div className="p-3 bg-background rounded-lg border">
+                  <div className="font-medium text-muted-foreground text-xs flex items-center gap-1">
+                    <Navigation className="h-3 w-3" />
+                    COURSE
+                  </div>
+                  <div className="mt-1">
+                    {selectedVessel.course}°
+                  </div>
+                </div>
+                <div className="p-3 bg-background rounded-lg border">
+                  <div className="font-medium text-muted-foreground text-xs flex items-center gap-1">
+                    <Anchor className="h-3 w-3" />
+                    SPEED
+                  </div>
+                  <div className="mt-1">
+                    {selectedVessel.speed} kts
+                  </div>
+                </div>
+              </div>
+
+              {/* Vessel Details */}
+              {selectedVessel.draught && (
+                <div className="p-3 bg-accent/30 rounded-lg text-sm">
+                  <div className="font-medium text-primary flex items-center gap-1">
+                    <Gauge className="h-3 w-3" />
+                    Draught
+                  </div>
+                  <div className="text-foreground">{selectedVessel.draught}</div>
+                </div>
+              )}
+
+              {/* Ports & Schedule */}
+              {(selectedVessel.destination || selectedVessel.lastPort) && (
+                <div className="space-y-3">
+                  {selectedVessel.destination && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="font-medium text-blue-900 dark:text-blue-300">Destination</div>
+                      <div className="text-blue-700 dark:text-blue-400 font-medium">{selectedVessel.destination}</div>
+                      {selectedVessel.unlocode_destination && (
+                        <div className="text-xs text-blue-600 dark:text-blue-500 mt-1">
+                          UNLOCODE: {selectedVessel.unlocode_destination}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {selectedVessel.lastPort && (
+                    <div className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                      <div className="font-medium text-green-900 dark:text-green-300">Last Port</div>
+                      <div className="text-green-700 dark:text-green-400 font-medium">{selectedVessel.lastPort}</div>
+                      {selectedVessel.unlocode_lastport && (
+                        <div className="text-xs text-green-600 dark:text-green-500 mt-1">
+                          UNLOCODE: {selectedVessel.unlocode_lastport}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ETA & ATD */}
+              {(selectedVessel.etaUtc || selectedVessel.eta || selectedVessel.atdUtc || selectedVessel.atd) && (
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {(selectedVessel.etaUtc || selectedVessel.eta) && (
+                    <div className="p-3 bg-orange-50 dark:bg-orange-900/20 rounded-lg border border-orange-200 dark:border-orange-800">
+                      <div className="font-medium text-orange-900 dark:text-orange-300 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        ETA
+                      </div>
+                      <div className="text-orange-700 dark:text-orange-400">
+                        {selectedVessel.etaUtc || selectedVessel.eta}
+                      </div>
+                    </div>
+                  )}
+                  {(selectedVessel.atdUtc || selectedVessel.atd) && (
+                    <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="font-medium text-purple-900 dark:text-purple-300 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        ATD
+                      </div>
+                      <div className="text-purple-700 dark:text-purple-400">
+                        {selectedVessel.atdUtc || selectedVessel.atd}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Position Update Info */}
+              <div className="flex justify-between items-center text-xs text-muted-foreground border-t pt-3">
+                {selectedVessel.positionReceived && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    Position: {selectedVessel.positionReceived}
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+
+      {/* Right Content - Analysis Results */}
+      <div className="lg:col-span-8 space-y-6">
+        {selectedVessel ? (
+          <>
+            {/* Weather Data Display */}
+            <Card className="border-border">
+              <CardHeader className="bg-muted/30 border-b">
+                <CardTitle className="flex items-center gap-3">
+                  <Cloud className="h-5 w-5 text-primary" />
+                  <div>
+                    <div className="text-xl">Weather Analysis</div>
+                    <div className="text-sm font-normal text-muted-foreground">
+                      {selectedVessel.name}
+                    </div>
+                  </div>
+                </CardTitle>
+                <CardDescription className="text-sm mt-2">
+                  Real-time weather and marine conditions along the vessel's projected route
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <VesselWeatherDisplay weatherData={weatherData} isFetchingWeather={isFetchingWeather} />
+              </CardContent>
+            </Card>
+
+            {/* Route Analysis */}
+            {weatherData && (
+              <RouteAnalysisComponent
+                vessel={selectedVessel}
+                weatherData={weatherData}
+                onAnalysisComplete={(analysis: RouteAnalysisData) => setRouteAnalysis(analysis)}
+              />
+            )}
+
+            {/* Weather-Aware Routing */}
+            {routeAnalysis && (
+              <WeatherAwareRouting
+                vessel={selectedVessel}
+                routeAnalysis={routeAnalysis}
+                onRouteSelected={(route) => {
+                  console.log('Selected weather-aware route:', route);
+                  setSelectedAlternativeRoute(route);
+                  toast({
+                    title: "Alternative Route Selected",
+                    description: `${route.type === 'primary' ? 'Direct' : route.type} route selected. Map updated.`,
+                  });
+                }}
+              />
+            )}
+
+            {/* Route Weather Timeline */}
+            {routeAnalysis && routeAnalysis.projectedRoute && (
+              <RouteWeatherTimeline
+                routeWeather={routeAnalysis.projectedRoute}
+                vesselName={selectedVessel.name}
+              />
+            )}
+
+            {/* Interactive Map */}
+            {routeAnalysis && routeAnalysis.projectedRoute && (
+              <RouteMap
+                vessel={selectedVessel}
+                routeWeather={routeAnalysis.projectedRoute}
+                analysis={routeAnalysis}
+                alternativeRoute={selectedAlternativeRoute}
+              />
+            )}
+          </>
+        ) : (
+          <Card className="border-dashed border-2 border-border">
+            <CardContent className="flex flex-col items-center justify-center py-20">
+              <div className="p-3 rounded-full bg-muted mb-6">
+                <Search className="h-10 w-10 text-primary" />
+              </div>
+              <h3 className="text-xl font-semibold mb-3">Search for a Vessel</h3>
+              <p className="text-muted-foreground text-center max-w-md mb-6">
+                Enter a vessel's IMO number, MMSI, or name in the search box to begin analyzing
+                weather conditions along its route.
+              </p>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedVessel(demoVessel);
+                    fetchWeatherForVessel(demoVessel);
+                    toast({
+                      title: "Demo Mode",
+                      description: "Loading sample vessel data from September 2025. This is not live data.",
+                      className: "border-amber-500 bg-amber-50"
+                    });
+                  }}
+                  className="gap-2 border-amber-500/30 hover:bg-amber-50 text-amber-700"
+                >
+                  <Play className="h-4 w-4" />
+                  Try Sample Data
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

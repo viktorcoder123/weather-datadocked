@@ -20,31 +20,32 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 210 50% 15%;
 
-    --primary: 210 100% 20%;
-    --primary-foreground: 210 100% 97%;
+    /* DataDocked Brand Color: #00459a = HSL(207, 100%, 30%) */
+    --primary: 207 100% 30%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 200 50% 85%;
-    --secondary-foreground: 210 50% 15%;
+    --secondary: 207 20% 90%;
+    --secondary-foreground: 207 100% 15%;
 
-    --muted: 200 30% 92%;
-    --muted-foreground: 210 25% 45%;
+    --muted: 207 10% 95%;
+    --muted-foreground: 207 30% 45%;
 
-    --accent: 195 100% 25%;
-    --accent-foreground: 210 100% 97%;
+    --accent: 207 100% 25%;
+    --accent-foreground: 0 0% 100%;
 
     --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 200 30% 85%;
-    --input: 200 30% 90%;
-    --ring: 210 100% 20%;
+    --border: 207 20% 88%;
+    --input: 207 15% 92%;
+    --ring: 207 100% 30%;
 
-    /* Maritime specific colors */
-    --ocean-deep: 210 100% 15%;
-    --ocean-medium: 210 80% 35%;
-    --ocean-light: 200 60% 65%;
-    --wave: 190 100% 85%;
-    --maritime-accent: 45 100% 50%;
+    /* DataDocked Maritime Colors */
+    --ocean-deep: 207 100% 15%;
+    --ocean-medium: 207 80% 35%;
+    --ocean-light: 207 60% 65%;
+    --wave: 200 100% 85%;
+    --maritime-accent: 207 100% 40%;
 
     --radius: 0.5rem;
 
@@ -75,31 +76,32 @@ All colors MUST be HSL.
     --popover: 210 40% 12%;
     --popover-foreground: 210 30% 92%;
 
-    --primary: 200 100% 70%;
-    --primary-foreground: 210 50% 8%;
+    /* DataDocked Brand - Dark Mode */
+    --primary: 207 100% 60%;
+    --primary-foreground: 207 100% 8%;
 
-    --secondary: 210 30% 18%;
-    --secondary-foreground: 210 30% 92%;
+    --secondary: 207 20% 18%;
+    --secondary-foreground: 207 10% 92%;
 
-    --muted: 210 30% 15%;
-    --muted-foreground: 210 20% 65%;
+    --muted: 207 20% 15%;
+    --muted-foreground: 207 15% 65%;
 
-    --accent: 195 100% 50%;
-    --accent-foreground: 210 50% 8%;
+    --accent: 207 100% 50%;
+    --accent-foreground: 207 100% 8%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 210 30% 18%;
-    --input: 210 30% 18%;
-    --ring: 200 100% 70%;
+    --border: 207 20% 18%;
+    --input: 207 20% 18%;
+    --ring: 207 100% 60%;
 
-    /* Maritime specific colors - dark mode */
-    --ocean-deep: 210 100% 10%;
-    --ocean-medium: 210 80% 25%;
-    --ocean-light: 200 60% 45%;
-    --wave: 190 100% 75%;
-    --maritime-accent: 45 100% 60%;
+    /* DataDocked Maritime - Dark Mode */
+    --ocean-deep: 207 100% 8%;
+    --ocean-medium: 207 80% 25%;
+    --ocean-light: 207 60% 45%;
+    --wave: 200 100% 75%;
+    --maritime-accent: 207 100% 50%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -117,6 +119,99 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+
+  /* Modern typography improvements */
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  h1 {
+    @apply text-3xl font-bold;
+  }
+
+  h2 {
+    @apply text-2xl font-semibold;
+  }
+
+  h3 {
+    @apply text-xl font-semibold;
+  }
+
+  /* Enhanced scrollbars */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-muted/30;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-primary/20 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary/40;
+  }
+}
+
+@layer components {
+  /* Modern glass morphism effect */
+  .glass {
+    backdrop-filter: blur(16px) saturate(180%);
+    background-color: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  /* Elevated card styling */
+  .card-elevated {
+    @apply shadow-lg shadow-primary/5 border-primary/10;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .card-elevated:hover {
+    @apply shadow-xl shadow-primary/10 -translate-y-1;
+  }
+
+  /* Clean solid backgrounds */
+  .bg-primary-solid {
+    background: hsl(var(--primary));
+  }
+
+  .bg-subtle {
+    background: hsl(var(--muted));
+  }
+
+  /* Status badges with better styling */
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-underway {
+    @apply bg-green-100 text-green-800 border border-green-200;
+  }
+
+  .status-anchored {
+    @apply bg-yellow-100 text-yellow-800 border border-yellow-200;
+  }
+
+  .status-moored {
+    @apply bg-blue-100 text-blue-800 border border-blue-200;
+  }
+
+  /* Enhanced button styling */
+  .btn-primary {
+    @apply bg-primary hover:bg-primary/90 text-primary-foreground;
+    box-shadow: 0 4px 12px rgba(0, 69, 154, 0.25);
+    transition: all 0.2s ease-in-out;
+  }
+
+  .btn-primary:hover {
+    box-shadow: 0 6px 16px rgba(0, 69, 154, 0.35);
+    transform: translateY(-1px);
   }
 }

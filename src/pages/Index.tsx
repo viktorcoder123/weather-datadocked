@@ -1,7 +1,6 @@
 import { useState } from "react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Settings, Ship, Cloud, Waves } from "lucide-react";
+import { Settings, Cloud, MapPin, Navigation, Ship } from "lucide-react";
 import { ApiKeySetup } from "@/components/ApiKeySetup";
 import { VesselWeatherIntegration } from "@/components/VesselWeatherIntegration";
 
@@ -9,26 +8,31 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<"dashboard" | "setup">("dashboard");
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-maritime-wave via-background to-maritime-light">
-      <header className="border-b border-border bg-card/80 backdrop-blur-sm">
+    <div className="min-h-screen bg-background">
+      <header className="bg-primary border-b border-primary-foreground/10 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-primary text-primary-foreground">
-                <Waves className="h-6 w-6" />
+            <div className="flex items-center gap-4">
+              <div className="p-2 rounded-lg bg-white/10">
+                <Cloud className="h-7 w-7 text-white" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-foreground">Maritime Weather</h1>
-                <p className="text-sm text-muted-foreground">Vessel tracking & weather insights</p>
+                <h1 className="text-2xl font-bold text-white">
+                  Weather Docked
+                </h1>
+                <p className="text-sm text-white/70">
+                  Maritime Weather Intelligence for Vessel Routes
+                </p>
               </div>
             </div>
             <Button
-              variant={activeTab === "setup" ? "default" : "outline"}
+              variant="secondary"
               onClick={() => setActiveTab(activeTab === "setup" ? "dashboard" : "setup")}
-              className="gap-2"
+              className="gap-2 bg-white/10 hover:bg-white/20 text-white border-0"
+              size="sm"
             >
               <Settings className="h-4 w-4" />
-              {activeTab === "setup" ? "Back to Dashboard" : "API Setup"}
+              {activeTab === "setup" ? "Dashboard" : "Setup"}
             </Button>
           </div>
         </div>
@@ -36,56 +40,57 @@ const Index = () => {
 
       <main className="container mx-auto px-4 py-8">
         {activeTab === "setup" ? (
-          <ApiKeySetup />
+          <div className="max-w-2xl mx-auto">
+            <div className="bg-card rounded-xl border border-border p-8">
+              <ApiKeySetup />
+            </div>
+          </div>
         ) : (
-          <div className="space-y-8">
-            {/* Overview Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <Card className="border-maritime-medium/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Ship className="h-5 w-5 text-maritime-medium" />
-                    Active Vessels
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-maritime-deep">--</div>
-                  <CardDescription>Tracked vessels</CardDescription>
-                </CardContent>
-              </Card>
-
-              <Card className="border-maritime-medium/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Cloud className="h-5 w-5 text-maritime-medium" />
-                    Weather Zones
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-maritime-deep">--</div>
-                  <CardDescription>Active weather areas</CardDescription>
-                </CardContent>
-              </Card>
-
-              <Card className="border-maritime-medium/20">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Waves className="h-5 w-5 text-maritime-medium" />
-                    Alerts
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-maritime-accent">--</div>
-                  <CardDescription>Active weather alerts</CardDescription>
-                </CardContent>
-              </Card>
+          <div className="space-y-6">
+            {/* Clean Hero Section */}
+            <div className="text-center py-8 border-b border-border">
+              <div className="flex items-center justify-center gap-4 mb-4">
+                <Ship className="h-6 w-6 text-primary" />
+                <Navigation className="h-5 w-5 text-primary/70" />
+                <MapPin className="h-5 w-5 text-primary/70" />
+              </div>
+              <h2 className="text-3xl font-semibold text-foreground mb-3">
+                Maritime Weather Intelligence
+              </h2>
+              <p className="text-base text-muted-foreground max-w-2xl mx-auto mb-3">
+                Get precise weather intelligence based on any vessel's current position and predicted journey.
+                Analyze conditions ahead, monitor route-specific forecasts, and receive targeted weather insights for maritime operations.
+              </p>
+              <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                <span>Powered by</span>
+                <span className="font-semibold text-primary">DataDocked</span>
+              </div>
             </div>
 
-            {/* Main Content */}
+            {/* Main Integration */}
             <VesselWeatherIntegration />
           </div>
         )}
       </main>
+
+      {/* Footer with DataDocked Attribution */}
+      <footer className="mt-auto py-6 border-t border-border">
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              © 2024 Weather Docked • Powered by{" "}
+              <a
+                href="https://datadocked.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 font-medium transition-colors"
+              >
+                DataDocked
+              </a>
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
