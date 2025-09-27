@@ -71,7 +71,7 @@ export const VesselDashboard = () => {
           Vessel Tracking
         </CardTitle>
         <CardDescription>
-          Search and track maritime vessels using DataDocked API
+          Search and track maritime vessels using Data Docked API
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -213,8 +213,8 @@ export const RouteMap = ({ vessel, routeWeather, analysis, alternativeRoute }: R
 
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 12px;">
                   <div><strong>🌬️ Wind:</strong> ${windSpeed.toFixed(1)} kts</div>
-                  <div><strong>🌊 Waves:</strong> ${waveHeight.toFixed(1)} m</div>
-                  <div><strong>👁️ Visibility:</strong> ${(weather.visibility || 10).toFixed(1)} km</div>
+                  <div><strong>🌊 Waves:</strong> ${waveHeight ? waveHeight.toFixed(1) + ' m' : 'N/A'}</div>
+                  <div><strong>👁️ Visibility:</strong> ${weather.visibility ? weather.visibility.toFixed(1) + ' km' : 'N/A'}</div>
                   <div><strong>🌡️ Temp:</strong> ${(weather.temperature || 20).toFixed(1)}°C</div>
                 </div>
 

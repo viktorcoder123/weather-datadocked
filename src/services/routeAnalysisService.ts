@@ -715,8 +715,8 @@ export const analyzeVesselRoute = async (vessel: Vessel, weatherData: any): Prom
         const weatherData = {
           windSpeed: current.wind_kph || stormglass.windSpeed?.sg || 15,
           windDirection: current.wind_degree || stormglass.windDirection?.sg || 180,
-          waveHeight: stormglass.waveHeight?.sg || current.wave_height_m || 1.5,
-          visibility: current.vis_km || stormglass.visibility?.sg || 10,
+          waveHeight: stormglass.waveHeight?.sg || current.wave_height_m || null,
+          visibility: current.vis_km || stormglass.visibility?.sg || null,
           precipitation: current.precip_mm || 0,
           temperature: current.temp_c || 15,
           pressure: current.pressure_mb || 1013,

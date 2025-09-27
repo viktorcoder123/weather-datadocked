@@ -282,7 +282,7 @@ export const RouteAnalysisComponent = ({ vessel, weatherData, onAnalysisComplete
                       <div className="font-medium">{point.distanceFromStart.toFixed(0)} nm</div>
                       {point.weather && (
                         <div className="text-muted-foreground">
-                          {point.weather.windSpeed.toFixed(0)} kts, {point.weather.waveHeight?.toFixed(1)}m
+                          {point.weather.windSpeed.toFixed(0)} kts, {point.weather.waveHeight ? point.weather.waveHeight.toFixed(1) + 'm' : 'N/A'}
                         </div>
                       )}
                     </div>

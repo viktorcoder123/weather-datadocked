@@ -60,7 +60,7 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
   const getWeatherSeverity = (weather: any) => {
     const wind = weather.windSpeed || 0;
     const wave = weather.waveHeight || 0;
-    const vis = weather.visibility || 10;
+    const vis = weather.visibility;
 
     let score = 0;
     if (wind > 35) score += 3;
@@ -70,8 +70,10 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
     if (wave > 4) score += 3;
     else if (wave > 2) score += 1;
 
-    if (vis < 1) score += 2;
-    else if (vis < 5) score += 1;
+    if (vis !== null && vis !== undefined) {
+      if (vis < 1) score += 2;
+      else if (vis < 5) score += 1;
+    }
 
     if (score >= 6) return 'severe';
     if (score >= 4) return 'high';
@@ -93,10 +95,12 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
     new Date(a.estimatedTime).getTime() - new Date(b.estimatedTime).getTime()
   );
 
+  const visibilityValues = sortedWeather.map(w => w.weather?.visibility).filter(v => v !== null && v !== undefined);
+
   const weatherSummary = {
     maxWind: Math.max(...sortedWeather.map(w => w.weather?.windSpeed || 0)),
     maxWave: Math.max(...sortedWeather.map(w => w.weather?.waveHeight || 0)),
-    minVis: Math.min(...sortedWeather.map(w => w.weather?.visibility || 10)),
+    minVis: visibilityValues.length > 0 ? Math.min(...visibilityValues) : null,
     avgWind: sortedWeather.reduce((sum, w) => sum + (w.weather?.windSpeed || 0), 0) / sortedWeather.length
   };
 
@@ -188,7 +192,7 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
                             <Waves className="h-3 w-3" />
                             Waves {getWaveIcon(weather.waveHeight)}
                           </div>
-                          <div>{weather.waveHeight?.toFixed(1)} m</div>
+                          <div>{weather.waveHeight ? weather.waveHeight.toFixed(1) + ' m' : 'N/A'}</div>
                         </div>
 
                         <div className="p-2 bg-accent/30 rounded">
@@ -196,7 +200,7 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
                             <Eye className="h-3 w-3" />
                             Visibility {getVisibilityIcon(weather.visibility)}
                           </div>
-                          <div>{weather.visibility?.toFixed(1)} km</div>
+                          <div>{weather.visibility ? weather.visibility.toFixed(1) + ' km' : 'N/A'}</div>
                         </div>
                       </div>
 
@@ -250,7 +254,7 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
                   <Waves className="h-4 w-4 text-blue-600" />
                   <span className="text-sm font-medium">Max Waves</span>
                 </div>
-                <p className="text-lg font-semibold">{weatherSummary.maxWave.toFixed(1)} m</p>
+                <p className="text-lg font-semibold">{weatherSummary.maxWave ? weatherSummary.maxWave.toFixed(1) + ' m' : 'N/A'}</p>
               </Card>
 
               <Card className="p-4">
@@ -258,7 +262,7 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
                   <Eye className="h-4 w-4 text-gray-600" />
                   <span className="text-sm font-medium">Min Visibility</span>
                 </div>
-                <p className="text-lg font-semibold">{weatherSummary.minVis.toFixed(1)} km</p>
+                <p className="text-lg font-semibold">{weatherSummary.minVis ? weatherSummary.minVis.toFixed(1) + ' km' : 'N/A'}</p>
               </Card>
 
               <Card className="p-4">
@@ -340,7 +344,7 @@ export const RouteWeatherTimeline = ({ routeWeather, vesselName }: RouteWeatherT
                   {sortedWeather.slice(0, 5).map((point, index) => (
                     <div key={index} className="flex items-center justify-between text-sm">
                       <span>{new Date(point.estimatedTime).toLocaleDateString()}</span>
-                      <span>{point.weather?.waveHeight?.toFixed(1)} m</span>
+                      <span>{point.weather?.waveHeight ? point.weather.waveHeight.toFixed(1) + ' m' : 'N/A'}</span>
                     </div>
                   ))}
                 </div>

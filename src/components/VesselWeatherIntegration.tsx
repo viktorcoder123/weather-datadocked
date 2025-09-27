@@ -289,7 +289,7 @@ export const VesselWeatherIntegration = ({ onNavigateToSetup }: VesselWeatherInt
             <ul className="list-disc list-inside space-y-1 mt-2">
               {!hasApiKeys.datadocked && (
                 <li>
-                  <strong>DataDocked API key</strong> - Required for vessel tracking
+                  <strong>Data Docked API key</strong> - Required for vessel tracking
                 </li>
               )}
               {!hasApiKeys.weatherApis && (
@@ -672,6 +672,8 @@ export const VesselWeatherIntegration = ({ onNavigateToSetup }: VesselWeatherInt
         )}
       </div>
     </div>
-    </div>
+  </div>
   );
 };
+
+export default VesselWeatherIntegration;

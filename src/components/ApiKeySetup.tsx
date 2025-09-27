@@ -91,11 +91,11 @@ export const ApiKeySetup = () => {
   const apiConfigs = [
     {
       key: "datadocked" as keyof ApiKeyData,
-      title: "DataDocked API",
+      title: "Data Docked API",
       description: "Vessel location and vessel data",
       icon: Ship,
       url: "https://datadocked.com",
-      placeholder: "Enter your DataDocked API key",
+      placeholder: "Enter your Data Docked API key",
     },
     {
       key: "stormglass" as keyof ApiKeyData,

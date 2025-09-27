@@ -344,10 +344,8 @@ const analyzeRouteWeatherSummary = (routeWeather: WeatherAtPoint[]) => {
     return sum + wave;
   }, 0) / weatherPoints.length;
 
-  const avgVisibility = weatherPoints.reduce((sum, w) => {
-    const vis = w.current?.vis_km || w.stormglass?.visibility?.sg || 10;
-    return sum + vis;
-  }, 0) / weatherPoints.length;
+  const visibilityValues = weatherPoints.map(w => w.current?.vis_km || w.stormglass?.visibility?.sg).filter(v => v != null);
+  const avgVisibility = visibilityValues.length > 0 ? visibilityValues.reduce((sum, v) => sum + v, 0) / visibilityValues.length : null;
 
   // Find worst conditions
   const worstWind = Math.max(...weatherPoints.map(w =>
@@ -358,17 +356,16 @@ const analyzeRouteWeatherSummary = (routeWeather: WeatherAtPoint[]) => {
     w.stormglass?.waveHeight?.sg || 0
   ));
 
-  const worstVisibility = Math.min(...weatherPoints.map(w =>
-    w.current?.vis_km || w.stormglass?.visibility?.sg || 10
-  ));
+  const visibilityForWorst = weatherPoints.map(w => w.current?.vis_km || w.stormglass?.visibility?.sg).filter(v => v != null);
+  const worstVisibility = visibilityForWorst.length > 0 ? Math.min(...visibilityForWorst) : null;
 
   // Identify critical periods
   const criticalPeriods = weatherPoints.filter(w => {
     const windSpeed = w.current?.wind_kph || w.stormglass?.windSpeed?.sg || 0;
     const waveHeight = w.stormglass?.waveHeight?.sg || 0;
-    const visibility = w.current?.vis_km || w.stormglass?.visibility?.sg || 10;
+    const visibility = w.current?.vis_km || w.stormglass?.visibility?.sg;
 
-    return windSpeed > 25 || waveHeight > 3 || visibility < 2;
+    return windSpeed > 25 || waveHeight > 3 || (visibility !== null && visibility < 2);
   }).map(w => ({
     time: w.time,
     location: { lat: w.lat, lng: w.lng },
@@ -400,7 +397,7 @@ const analyzeRouteWeatherSummary = (routeWeather: WeatherAtPoint[]) => {
 const calculateSeverity = (weather: WeatherAtPoint): number => {
   const windSpeed = weather.current?.wind_kph || weather.stormglass?.windSpeed?.sg || 0;
   const waveHeight = weather.stormglass?.waveHeight?.sg || 0;
-  const visibility = weather.current?.vis_km || weather.stormglass?.visibility?.sg || 10;
+  const visibility = weather.current?.vis_km || weather.stormglass?.visibility?.sg;
 
   let severity = 0;
 
@@ -444,7 +441,7 @@ const generateWeatherTimeline = (routeWeather: WeatherAtPoint[]) => {
   const visibilityTrend = sortedWeather.map(w => ({
     time: w.time,
     distance: w.distanceFromStart,
-    visibility: w.current?.vis_km || w.stormglass?.visibility?.sg || 10
+    visibility: w.current?.vis_km || w.stormglass?.visibility?.sg
   }));
 
   return {

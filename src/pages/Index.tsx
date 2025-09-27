@@ -63,7 +63,7 @@ const Index = () => {
               </p>
               <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                 <span>Powered by</span>
-                <span className="font-semibold text-primary">DataDocked</span>
+                <span className="font-semibold text-primary">Data Docked</span>
               </div>
             </div>
 
@@ -73,7 +73,7 @@ const Index = () => {
         )}
       </main>
 
-      {/* Footer with DataDocked Attribution */}
+      {/* Footer with Data Docked Attribution */}
       <footer className="mt-auto py-6 border-t border-border">
         <div className="container mx-auto px-4">
           <div className="text-center">
@@ -85,7 +85,7 @@ const Index = () => {
                 rel="noopener noreferrer"
                 className="text-primary hover:text-primary/80 font-medium transition-colors"
               >
-                DataDocked
+                Data Docked
               </a>
             </p>
           </div>

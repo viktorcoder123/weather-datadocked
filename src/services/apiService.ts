@@ -136,65 +136,26 @@ export const fetchStormGlassWeather = async (lat: number, lng: number) => {
     throw new Error('StormGlass API key not configured');
   }
 
+  // Use only essential marine parameters to avoid quota issues
   const params = [
-    'airTemperature',
-    'airTemperature80m',
-    'airTemperature100m',
-    'airTemperature1000hpa',
-    'airTemperature800hpa',
-    'airTemperature500hpa',
-    'airTemperature200hpa',
-    'airPressure',
-    'cloudCover',
-    'currentDirection',
-    'currentSpeed',
-    'gust',
-    'humidity',
-    'iceCover',
-    'precipitation',
-    'snowDepth',
-    'seaLevel',
-    'swellDirection',
+    'waveHeight',
+    'waveDirection',
+    'wavePeriod',
     'swellHeight',
+    'swellDirection',
     'swellPeriod',
-    'secondarySwellPeriod',
-    'secondarySwellDirection',
-    'secondarySwellHeight',
+    'windSpeed',
+    'windDirection',
     'visibility',
     'waterTemperature',
-    'waveDirection',
-    'waveHeight',
-    'wavePeriod',
-    'windWaveDirection',
-    'windWaveHeight',
-    'windWavePeriod',
-    'windDirection',
-    'windDirection20m',
-    'windDirection30m',
-    'windDirection40m',
-    'windDirection50m',
-    'windDirection80m',
-    'windDirection100m',
-    'windDirection1000hpa',
-    'windDirection800hpa',
-    'windDirection500hpa',
-    'windDirection200hpa',
-    'windSpeed',
-    'windSpeed20m',
-    'windSpeed30m',
-    'windSpeed40m',
-    'windSpeed50m',
-    'windSpeed80m',
-    'windSpeed100m',
-    'windSpeed1000hpa',
-    'windSpeed800hpa',
-    'windSpeed500hpa',
-    'windSpeed200hpa'
+    'currentSpeed',
+    'currentDirection'
   ].join(',');
 
-  const end = new Date();
-  const start = new Date();
-  start.setHours(start.getHours() - 1);
+  // StormGlass requires UTC timestamps and works better with shorter time ranges
+  const now = new Date();
+  const start = new Date(now.getTime() - 60 * 60 * 1000); // 1 hour ago
+  const end = new Date(now.getTime() + 6 * 60 * 60 * 1000); // 6 hours ahead
 
   try {
     const response = await fetch(
@@ -207,10 +168,18 @@ export const fetchStormGlassWeather = async (lat: number, lng: number) => {
     );
 
     if (!response.ok) {
-      throw new Error(`StormGlass API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('StormGlass API Error Details:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        body: errorText
+      });
+      throw new Error(`StormGlass API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('StormGlass API Response:', JSON.stringify(data, null, 2));
     return data;
   } catch (error) {
     console.error('StormGlass API error:', error);
