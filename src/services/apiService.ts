@@ -50,7 +50,14 @@ export const fetchDataDockedVessel = async (imoOrMmsi: string) => {
       // Debug: Log all available fields to understand the API response structure
       console.log('DataDocked vessel fields:', Object.keys(vessel));
       console.log('DataDocked vessel data:', vessel);
-      return {
+      console.log('UNLOCODE mapping check:', {
+        raw_unlocode_destination: vessel.unlocode_destination,
+        raw_destinationUnlocode: vessel.destinationUnlocode,
+        raw_destination_unlocode: vessel.destination_unlocode,
+        will_map_to: vessel.unlocode_destination || vessel.destinationUnlocode || vessel.destination_unlocode
+      });
+
+      const mappedVessel = {
         id: vessel.imo || vessel.mmsi,
         name: vessel.name,
         imo: vessel.imo,
@@ -71,6 +78,14 @@ export const fetchDataDockedVessel = async (imoOrMmsi: string) => {
         draught: vessel.draught,
         positionReceived: vessel.positionReceived
       };
+
+      console.log('Final mapped vessel object:', mappedVessel);
+      console.log('Mapped UNLOCODE fields:', {
+        unlocode_destination: mappedVessel.unlocode_destination,
+        unlocode_lastport: mappedVessel.unlocode_lastport
+      });
+
+      return mappedVessel;
     }
 
     return null;

@@ -103,8 +103,12 @@ export const projectPoint = (lat: number, lon: number, bearing: number, distance
 export const parseDestinationCoordinates = async (destination: string): Promise<{ lat: number; lng: number } | null> => {
   // Use the Supabase port lookup service instead of hardcoded coordinates
   try {
+    console.log('Attempting to import portService for destination:', destination);
     const { searchPorts } = await import('./portService');
+    console.log('Successfully imported portService, searching for:', destination);
+
     const ports = await searchPorts(destination);
+    console.log('Port search results:', ports);
 
     if (ports && ports.length > 0) {
       const port = ports[0]; // Take the first/best match
@@ -119,6 +123,20 @@ export const parseDestinationCoordinates = async (destination: string): Promise<
     return null;
   } catch (error) {
     console.error('Error looking up port coordinates:', error);
+
+    // Temporary fallback for critical ports while debugging Supabase issue
+    const fallbackPorts: Record<string, { lat: number; lng: number }> = {
+      'BEZEE': { lat: 51.3333, lng: 3.2167 },
+      'Zeebrugge, Belgium': { lat: 51.3333, lng: 3.2167 },
+      'USCLE': { lat: 41.4993, lng: -81.6944 },
+      'Cleveland, United States (USA)': { lat: 41.4993, lng: -81.6944 }
+    };
+
+    if (fallbackPorts[destination]) {
+      console.log('Using fallback coordinates for:', destination, fallbackPorts[destination]);
+      return fallbackPorts[destination];
+    }
+
     return null;
   }
 };

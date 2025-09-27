@@ -105,6 +105,7 @@ class PortService:
             'Cleveland, United States (USA)': (41.4993, -81.6944),
             'Zeebrugge': (51.3333, 3.2167),
             'Zeebrugge, Belgium': (51.3333, 3.2167),
+            'BEZEE': (51.3333, 3.2167),
             'Vancouver': (49.2827, -123.1207),
             'Singapore': (1.2966, 103.7764),
             'Hong Kong': (22.3193, 114.1694),

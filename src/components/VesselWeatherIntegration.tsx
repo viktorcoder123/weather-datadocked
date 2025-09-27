@@ -112,7 +112,9 @@ export const VesselWeatherIntegration = () => {
           draught: v.draught,
           navigationalStatus: v.navigationalStatus,
           positionReceived: v.positionReceived,
-          updateTime: v.updateTime
+          updateTime: v.updateTime,
+          unlocode_destination: v.unlocode_destination,
+          unlocode_lastport: v.unlocode_lastport
         }));
       }
 
