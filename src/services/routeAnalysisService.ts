@@ -121,7 +121,10 @@ export const parseDestinationCoordinates = (destination: string): { lat: number;
     'Piraeus': { lat: 37.9472, lng: 23.6348 },
     'Istanbul': { lat: 41.0082, lng: 28.9784 },
     'Tallinn': { lat: 59.4370, lng: 24.7536 },
-    'Tallinn, Estonia': { lat: 59.4370, lng: 24.7536 }
+    'Tallinn, Estonia': { lat: 59.4370, lng: 24.7536 },
+    'Cleveland': { lat: 41.4993, lng: -81.6944 },
+    'Cleveland, United States': { lat: 41.4993, lng: -81.6944 },
+    'Cleveland, United States (USA)': { lat: 41.4993, lng: -81.6944 }
   };
 
   // Try to find exact match first
@@ -593,6 +596,17 @@ export const generateRecommendations = (analysis: RouteAnalysis): string[] => {
   }
 
   return recommendations;
+};
+
+// Weather-aware routing analysis
+export const analyzeWeatherAwareRouting = async (vessel: Vessel, routeAnalysis: RouteAnalysis): Promise<any> => {
+  try {
+    const WeatherAwareRoutingService = await import('./weatherAwareRoutingService');
+    return await WeatherAwareRoutingService.default.analyzeWeatherAwareRouting(vessel, routeAnalysis);
+  } catch (error) {
+    console.warn('Weather-aware routing service unavailable:', error);
+    return null;
+  }
 };
 
 // Main route analysis function

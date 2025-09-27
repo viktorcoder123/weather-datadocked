@@ -10,6 +10,7 @@ import { VesselWeatherDisplay } from "./VesselWeatherDisplay";
 import { RouteAnalysisComponent } from "./RouteAnalysis";
 import { RouteWeatherTimeline } from "./RouteWeatherTimeline";
 import { RouteMap } from "./RouteMap";
+import { WeatherAwareRouting } from "./WeatherAwareRouting";
 
 interface Vessel {
   id: string;
@@ -62,6 +63,7 @@ export const VesselWeatherIntegration = () => {
   const [selectedVessel, setSelectedVessel] = useState<Vessel | null>(null);
   const [weatherData, setWeatherData] = useState<WeatherData | null>(null);
   const [routeAnalysis, setRouteAnalysis] = useState<RouteAnalysisData | null>(null);
+  const [selectedAlternativeRoute, setSelectedAlternativeRoute] = useState<any>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [isFetchingWeather, setIsFetchingWeather] = useState(false);
@@ -338,12 +340,22 @@ export const VesselWeatherIntegration = () => {
                           <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
                             <div className="font-medium text-blue-900 dark:text-blue-300">Destination</div>
                             <div className="text-blue-700 dark:text-blue-400">{vessel.destination}</div>
+                            {vessel.unlocode_destination && (
+                              <div className="text-xs text-blue-600 dark:text-blue-500 mt-1">
+                                UNLOCODE: {vessel.unlocode_destination}
+                              </div>
+                            )}
                           </div>
                         )}
                         {vessel.lastPort && (
                           <div className="p-2 bg-green-50 dark:bg-green-900/20 rounded border border-green-200 dark:border-green-800">
                             <div className="font-medium text-green-900 dark:text-green-300">Last Port</div>
                             <div className="text-green-700 dark:text-green-400">{vessel.lastPort}</div>
+                            {vessel.unlocode_lastport && (
+                              <div className="text-xs text-green-600 dark:text-green-500 mt-1">
+                                UNLOCODE: {vessel.unlocode_lastport}
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
@@ -425,6 +437,22 @@ export const VesselWeatherIntegration = () => {
         />
       )}
 
+      {/* Weather-Aware Routing */}
+      {selectedVessel && routeAnalysis && (
+        <WeatherAwareRouting
+          vessel={selectedVessel}
+          routeAnalysis={routeAnalysis}
+          onRouteSelected={(route) => {
+            console.log('Selected weather-aware route:', route);
+            setSelectedAlternativeRoute(route);
+            toast({
+              title: "Alternative Route Selected",
+              description: `${route.type === 'primary' ? 'Direct' : route.type} route selected. Map updated.`,
+            });
+          }}
+        />
+      )}
+
       {/* Route Weather Timeline */}
       {selectedVessel && routeAnalysis && routeAnalysis.projectedRoute && (
         <RouteWeatherTimeline
@@ -439,6 +467,7 @@ export const VesselWeatherIntegration = () => {
           vessel={selectedVessel}
           routeWeather={routeAnalysis.projectedRoute}
           analysis={routeAnalysis}
+          alternativeRoute={selectedAlternativeRoute}
         />
       )}
     </div>

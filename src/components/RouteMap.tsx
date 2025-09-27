@@ -9,9 +9,10 @@ interface RouteMapProps {
   vessel: any;
   routeWeather: any[];
   analysis?: any;
+  alternativeRoute?: any;
 }
 
-export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
+export const RouteMap = ({ vessel, routeWeather, analysis, alternativeRoute }: RouteMapProps) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [mapInstance, setMapInstance] = useState<any>(null);
@@ -98,7 +99,9 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
 
       // Add route line if vessel is moving
       if (showRoute && routeWeather.length > 1) {
-        const routeCoords = routeWeather.map(point => [point.lat, point.lng]);
+        // Use alternative route waypoints if available, otherwise use original route
+        const routeWaypoints = alternativeRoute?.waypoints || routeWeather;
+        const routeCoords = routeWaypoints.map(point => [point.lat, point.lng]);
 
         // Check if vessel is stationary
         const isStationary = routeWeather.every(point =>
@@ -107,17 +110,35 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
         );
 
         if (!isStationary) {
+          // Color the route differently if it's an alternative route
+          const routeColor = alternativeRoute ? '#f97316' : '#2563eb'; // Orange for alternative, blue for primary
+
           L.polyline(routeCoords, {
-            color: '#2563eb',
+            color: routeColor,
             weight: 3,
             opacity: 0.7
           }).addTo(mapInstance);
+
+          // Add a badge/label indicating alternative route
+          if (alternativeRoute) {
+            const routeType = alternativeRoute.type || 'alternative';
+            L.popup()
+              .setLatLng(routeCoords[Math.floor(routeCoords.length / 2)])
+              .setContent(`
+                <div style="text-align: center; font-size: 12px; font-weight: bold; color: #f97316;">
+                  ${routeType.charAt(0).toUpperCase() + routeType.slice(1)} Route
+                </div>
+              `)
+              .openOn(mapInstance);
+          }
         }
       }
 
       // Add markers along route (weather + route waypoints)
       if (showWeather) {
-        routeWeather.forEach((point, index) => {
+        // Use alternative route waypoints if available, otherwise use original route
+        const displayWaypoints = alternativeRoute?.waypoints || routeWeather;
+        displayWaypoints.forEach((point, index) => {
           // Determine if this waypoint has weather data
           const hasWeather = point.weather && point.weather.windSpeed !== undefined;
 
@@ -229,14 +250,15 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
       }
 
       // Fit map bounds to show all points
-      if (routeWeather.length > 0) {
-        const bounds = L.latLngBounds(routeWeather.map(point => [point.lat, point.lng]));
+      const boundWaypoints = alternativeRoute?.waypoints || routeWeather;
+      if (boundWaypoints.length > 0) {
+        const bounds = L.latLngBounds(boundWaypoints.map(point => [point.lat, point.lng]));
         mapInstance.fitBounds(bounds, { padding: [20, 20] });
       }
     };
 
     updateMap();
-  }, [mapInstance, vessel, routeWeather, showWeather, showRoute, showRoutePointsOnly]);
+  }, [mapInstance, vessel, routeWeather, showWeather, showRoute, showRoutePointsOnly, alternativeRoute]);
 
   // Handle tab changes and fix map size when switching back to map tab
   useEffect(() => {
@@ -345,6 +367,18 @@ export const RouteMap = ({ vessel, routeWeather, analysis }: RouteMapProps) => {
                     <span>🚢</span>
                     <span>Vessel Position</span>
                   </div>
+                  {alternativeRoute && (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-1 bg-orange-500"></div>
+                        <span>Alternative Route</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-3 h-1 bg-blue-500"></div>
+                        <span>Primary Route</span>
+                      </div>
+                    </>
+                  )}
                   <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-green-500"></div>
                     <span>Good Conditions</span>
